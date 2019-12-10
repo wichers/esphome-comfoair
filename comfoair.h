@@ -2,8 +2,11 @@
 
 #include "esphome.h"
 #include "esphome/core/component.h"
-#include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/components/climate/climate.h"
+#include "esphome/components/climate/climate_mode.h"
+#include "esphome/components/climate/climate_traits.h"
+#include "esphome/components/custom/climate/custom_climate.h"
 
 namespace esphome {
 namespace comfoair {
@@ -54,13 +57,13 @@ static const uint8_t COMFOAIR_GET_ANALOG_INPUTS_RESPONSE = 0x14;
 static const uint8_t COMFOAIR_GET_ANALOG_INPUTS_LENGTH = 0x04;
 static const uint8_t COMFOAIR_GET_SENSOR_DATA_REQUEST = 0x97;
 static const uint8_t COMFOAIR_GET_SENSOR_DATA_RESPONSE = 0x98;
-static const uint8_t COMFOAIR_GET_SENSOR_DATA_RESPONSE = 0x11;
+static const uint8_t COMFOAIR_GET_SENSOR_DATA_LENGTH = 0x11;
 static const uint8_t COMFOAIR_GET_ANALOG_STATUS_REQUEST = 0x9d;
 static const uint8_t COMFOAIR_GET_ANALOG_STATUS_RESPONSE = 0x9e;
 static const uint8_t COMFOAIR_GET_ANALOG_STATUS_LENGTH = 0x0a;
 static const uint8_t COMFOAIR_GET_DELAYS_REQUEST = 0xc9;
 static const uint8_t COMFOAIR_GET_DELAYS_RESPONSE = 0xca;
-static const uint8_t COMFOAIR_GET_DELAYS_RESPONSE = 0x08;
+static const uint8_t COMFOAIR_GET_DELAYS_LENGTH = 0x08;
 static const uint8_t COMFOAIR_GET_VENTILATION_LEVEL_REQUEST = 0xcd;
 static const uint8_t COMFOAIR_GET_VENTILATION_LEVEL_RESPONSE = 0xce;
 static const uint8_t COMFOAIR_GET_VENTILATION_LEVEL_LENGTH = 0x0e;
@@ -117,7 +120,7 @@ static const uint8_t COMFOAIR_SET_OUTPUTS_REQUEST = 0x05;
 static const uint8_t COMFOAIR_SET_ANALOG_OUTPUTS_REQUEST = 0x07;
 static const uint8_t COMFOAIR_SET_VALVES_REQUEST = 0x09;
 
-class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
+class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTDevice {
  public:
 
   // For now poll every 2 seconds
@@ -156,7 +159,7 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
 
   void control(const climate::ClimateCall &call) {
     if (call.get_fan_mode().has_value()) {
-      int level = -1;
+      int level;
 
       this->fan_mode = *call.get_fan_mode();
       switch (this->fan_mode) {
@@ -174,6 +177,13 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
           break;
         case climate::CLIMATE_FAN_AUTO:
           level = 0x00;
+          break;
+        case climate::CLIMATE_FAN_ON:
+        case climate::CLIMATE_FAN_MIDDLE:
+        case climate::CLIMATE_FAN_FOCUS:
+        case climate::CLIMATE_FAN_DIFFUSE:
+				default:
+        	level = -1;
           break;
       }
 
@@ -198,7 +208,7 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
     ESP_LOGCONFIG(TAG, "  Bootloader %.10s v%0d.%02d b%2d", p + 3, *p, *(p + 1), *(p + 2));
     p = firmware_version_;
     ESP_LOGCONFIG(TAG, "  Firmware %.10s v%0d.%02d b%2d", p + 3, *p, *(p + 1), *(p + 2));
-    p = board_connector_version;
+    p = connector_board_version_;
     ESP_LOGCONFIG(TAG, "  Connector Board %.10s v%0d.%02d", p + 2, *p, *(p + 1));
     if (*(p + 12) != 0) {
       ESP_LOGCONFIG(TAG, "  CC-Ease v%0d.%02d", *(p + 12) >> 4, *(p + 12) & 0x0f);
@@ -266,21 +276,21 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
 
     ESP_LOGI(TAG, "Setting level to: %i", level);
     {
-      uint8_t command[COMFOAIR_SET_LEVEL_LENGTH] = {level & 0xff};
+      uint8_t command[COMFOAIR_SET_LEVEL_LENGTH] = {(uint8_t) level};
       this->write_command_(COMFOAIR_SET_LEVEL_REQUEST, command, sizeof(command));
     }
   }
 
-  void set_comfort_temperature_(int temperature) {
+  void set_comfort_temperature_(uint8_t temperature) {
     if (temperature < 0 || temperature > 30) {
       ESP_LOGI(TAG, "Ignoring invalid temperature request: %i", temperature);
       return;
-      }
+    }
 
     ESP_LOGI(TAG, "Setting temperature to: %i", temperature);
     {
-      uint8_t command[COMFOAIR_SET_COMFORT_TEMPERATURE_LENGTH] = {((temperature & 0xff ) + 20) * 2};
-      this->write_command_(COMFOAIR_SET_COMFORT_TEMPERATURE_REQUEST, command, sizeof(command));
+	    uint8_t command[COMFOAIR_SET_COMFORT_TEMPERATURE_LENGTH] = {(uint8_t) ((temperature + 20) * 2)};
+	    this->write_command_(COMFOAIR_SET_COMFORT_TEMPERATURE_REQUEST, command, sizeof(command));
     }
   }
 
@@ -294,7 +304,7 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
       this->write_array(command_data, command_data_length);
       this->write_byte(command + comfoair_checksum_(command_data, command_data_length));
     } else {
-      this->write_byte(comfoair_checksum_(command, 1));
+      this->write_byte(comfoair_checksum_(&command, 1));
     }
     this->write_byte(COMFOAIR_MSG_PREFIX);
     this->write_byte(COMFOAIR_MSG_TAIL);
@@ -334,7 +344,7 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
 
     uint8_t data_length = this->data_[COMFOAIR_MSG_DATA_LENGTH_IDX];
 
-    if ((COMFOAIR_MSG_HEAD_LENGTH + data_length + COMFOAIR_MSG_TAIL_LENGTH) > sizeof(this->data) {
+    if ((COMFOAIR_MSG_HEAD_LENGTH + data_length + COMFOAIR_MSG_TAIL_LENGTH) > sizeof(this->data_)) {
       ESP_LOGW(TAG, "ComfoAir message too large");
       return false;
     }
@@ -364,7 +374,7 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
 
   void parse_data_() {
     this->status_clear_warning();
-    uint8_t *msg = this->data_[COMFOAIR_MSG_HEAD_LENGTH];
+    uint8_t *msg = &this->data_[COMFOAIR_MSG_HEAD_LENGTH];
 
     switch (this->data_[COMFOAIR_MSG_IDENTIFIER_IDX]) {
       case COMFOAIR_GET_BOOTLOADER_VERSION_RESPONSE:
@@ -378,10 +388,10 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
         break;
       case COMFOAIR_GET_FAN_STATUS_RESPONSE: {
           if (this->fan_supply_air_percentage_ != nullptr) {
-            this->fan_supply_air_percentage_->set_value(msg[0]);
+            this->fan_supply_air_percentage_->publish_state(msg[0]);
           }
           if (this->fan_exhaust_air_percentage_ != nullptr) {
-            this->fan_exhaust_air_percentage_->set_value(msg[1]);
+            this->fan_exhaust_air_percentage_->publish_state(msg[1]);
           }
           if (this->fan_speed_air_ != nullptr) {
             this->fan_speed_air_->publish_state(1875000.0f / this->get_uint16_(2));
@@ -405,22 +415,21 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
         break;
       }
       case COMFOAIR_GET_TEMPERATURE_RESPONSE: {
-          // T1 / outside air
-          if (this->temperature_outside_air_sensor_ != nullptr) {
-            this->temperature_outside_air_sensor_->publish_state((msg[0] + 20) * 2);
-          }
-          // T2 / supply air
-          if (this->temperature_supply_air_sensor_ != nullptr) {
-            this->temperature_supply_air_sensor_->publish_state((msg[1] + 20) * 2);
-          }
-          // T3 / exhaust air
-          if (this->temperature_exhaust_air_sensor_ != nullptr) {
-            this->temperature_exhaust_air_sensor_->publish_state((msg[2] + 20) * 2);
-          }
-          // T4 / exhaust air
-          if (this->temperature_continued_air_ != nullptr) {
-            this->temperature_continued_air_->publish_state((msg[3] + 20) * 2);
-          }
+        // T1 / outside air
+        if (this->temperature_outside_air_sensor_ != nullptr) {
+          this->temperature_outside_air_sensor_->publish_state((msg[0] + 20) * 2);
+        }
+        // T2 / supply air
+        if (this->temperature_supply_air_sensor_ != nullptr) {
+          this->temperature_supply_air_sensor_->publish_state((msg[1] + 20) * 2);
+        }
+        // T3 / exhaust air
+        if (this->temperature_exhaust_air_sensor_ != nullptr) {
+          this->temperature_exhaust_air_sensor_->publish_state((msg[2] + 20) * 2);
+        }
+        // T4 / exhaust air
+        if (this->temperature_continued_air_ != nullptr) {
+          this->temperature_continued_air_->publish_state((msg[3] + 20) * 2);
         }
         break;
       }
@@ -436,21 +445,22 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
         // Fan Speed
         switch(msg[8]) {
           case 0x00:
-            this->fan_mode_(climate::CLIMATE_FAN_AUTO);
+            this->fan_mode = climate::CLIMATE_FAN_AUTO;
             break;
           case 0x01:
-            this->fan_mode_(climate::CLIMATE_FAN_OFF);
+            this->fan_mode = climate::CLIMATE_FAN_OFF;
             break;
           case 0x02:
-            this->fan_mode_(climate::CLIMATE_FAN_LOW);
+            this->fan_mode = climate::CLIMATE_FAN_LOW;
             break;
           case 0x03:
-            this->fan_mode_(climate::CLIMATE_FAN_MEDIUM);
+            this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
             break;
           case 0x04:
-            this->fan_mode_(climate::CLIMATE_FAN_HIGH);
+            this->fan_mode = climate::CLIMATE_FAN_HIGH;
             break;
         }
+				this->publish_state();
 
         // Supply air fan active (1 = active / 0 = inactive)
         if (this->supply_air_fan_active_ != nullptr) {
@@ -459,40 +469,40 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
         break;
       }
       case COMFOAIR_GET_TEMPERATURES_RESPONSE: {
-        {
-          // comfort temperature
-          this->set_target_temperature(msg[0]);
+        // comfort temperature
+        this->target_temperature = msg[0];
+				this->publish_state();
 
-          // T1 / outside air
-          if (this->temperature_outside_air_sensor_ != nullptr && msg[5] & 0x01) {
-            this->temperature_outside_air_sensor_->publish_state((msg[1] + 20) * 2);
-          }
-          // T2 / supply air
-          if (this->temperature_supply_air_sensor_ != nullptr && msg[5] & 0x02) {
-            this->temperature_supply_air_sensor_->publish_state((msg[2] + 20) * 2);
-          }
-          // T3 / exhaust air
-          if (this->temperature_exhaust_air_sensor_ != nullptr && msg[5] & 0x04) {
-            this->temperature_exhaust_air_sensor_->publish_state((msg[3] + 20) * 2);
-          }
-          // T4 / continued air
-          if (this->temperature_continued_air_ != nullptr && msg[5] & 0x08) {
-            this->temperature_continued_air_->publish_state((msg[4] + 20) * 2);
-          }
-          // EWT
-          if (this->temperature_ewt_sensor_ != nullptr && msg[5] & 0x10) {
-            this->temperature_ewt_sensor_->publish_state((msg[6] + 20) * 2);
-          }
-          // reheating
-          if (this->temperature_reheating_sensor_ != nullptr && msg[5] & 0x20) {
-            this->temperature_reheating_sensor_->publish_state((msg[7] + 20) * 2);
-          }
-          // kitchen hood
-          if (this->temperature_kitchen_hood_sensor_ != nullptr && msg[5] & 0x40) {
-            this->temperature_kitchen_hood_sensor_->publish_state((msg[8] + 20) * 2);
-          }
+        // T1 / outside air
+        if (this->temperature_outside_air_sensor_ != nullptr && msg[5] & 0x01) {
+          this->temperature_outside_air_sensor_->publish_state((msg[1] + 20) * 2);
+        }
+        // T2 / supply air
+        if (this->temperature_supply_air_sensor_ != nullptr && msg[5] & 0x02) {
+          this->temperature_supply_air_sensor_->publish_state((msg[2] + 20) * 2);
+        }
+        // T3 / exhaust air
+        if (this->temperature_exhaust_air_sensor_ != nullptr && msg[5] & 0x04) {
+          this->temperature_exhaust_air_sensor_->publish_state((msg[3] + 20) * 2);
+        }
+        // T4 / continued air
+        if (this->temperature_continued_air_ != nullptr && msg[5] & 0x08) {
+          this->temperature_continued_air_->publish_state((msg[4] + 20) * 2);
+        }
+        // EWT
+        if (this->temperature_ewt_sensor_ != nullptr && msg[5] & 0x10) {
+          this->temperature_ewt_sensor_->publish_state((msg[6] + 20) * 2);
+        }
+        // reheating
+        if (this->temperature_reheating_sensor_ != nullptr && msg[5] & 0x20) {
+          this->temperature_reheating_sensor_->publish_state((msg[7] + 20) * 2);
+        }
+        // kitchen hood
+        if (this->temperature_kitchen_hood_sensor_ != nullptr && msg[5] & 0x40) {
+          this->temperature_kitchen_hood_sensor_->publish_state((msg[8] + 20) * 2);
+        }
 
-          break;
+        break;
       }
     }
   }
@@ -503,7 +513,7 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
         this->fan_speed_air_ != nullptr ||
         this->fan_speed_exhaust_ != nullptr) {
       ESP_LOGD(TAG, "ComfoAir getting fan status");
-      this->comfoair_write_command_(COMFOAIR_GET_FAN_STATUS_REQUEST, nullptr, 0);
+      this->write_command_(COMFOAIR_GET_FAN_STATUS_REQUEST, nullptr, 0);
     }
   }
 
@@ -511,7 +521,7 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
     if (this->bypass_valve_percentage_ != nullptr ||
         this->preheating_ != nullptr) {
       ESP_LOGD(TAG, "ComfoAir getting valve status");
-      this->comfoair_write_command_(COMFOAIR_GET_VALVE_STATUS_REQUEST, nullptr, 0);
+      this->write_command_(COMFOAIR_GET_VALVE_STATUS_REQUEST, nullptr, 0);
     }
   }
 
@@ -521,27 +531,27 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
        this->temperature_exhaust_air_sensor_ != nullptr ||
        this->temperature_outside_air_sensor_ != nullptr) {
       ESP_LOGD(TAG, "ComfoAir getting temperature");
-      this->comfoair_write_command_(COMFOAIR_GET_TEMPERATURE_REQUEST, nullptr, 0);
+      this->write_command_(COMFOAIR_GET_TEMPERATURE_REQUEST, nullptr, 0);
     }
   }
 
   void get_sensor_data_() {
     if (this->temperature_enthalpy_sensor_ != nullptr) {
       ESP_LOGD(TAG, "ComfoAir getting sensor data");
-      this->comfoair_write_command_(COMFOAIR_GET_SENSOR_DATA_REQUEST, nullptr, 0);
+      this->write_command_(COMFOAIR_GET_SENSOR_DATA_REQUEST, nullptr, 0);
     }
   }
 
   void get_ventilation_level_() {
     // Always execute as ventilation level is always present
     ESP_LOGD(TAG, "ComfoAir getting ventilation level");
-    this->comfoair_write_command_(COMFOAIR_GET_VENTILATION_LEVEL_REQUEST, nullptr, 0);
+    this->write_command_(COMFOAIR_GET_VENTILATION_LEVEL_REQUEST, nullptr, 0);
   }
 
   void get_temperatures_() {
     // Always execute as comfort temperature is always present
     ESP_LOGD(TAG, "ComfoAir getting temperatures");
-    this->comfoair_write_command_(COMFOAIR_GET_TEMPERATURES_REQUEST, nullptr, 0);
+    this->write_command_(COMFOAIR_GET_TEMPERATURES_REQUEST, nullptr, 0);
   }
 
   uint8_t get_uint8_t_(uint8_t start_index) const {
@@ -552,22 +562,6 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
     return (uint16_t(this->data_[COMFOAIR_MSG_HEAD_LENGTH + start_index + 1]) << 8) | uint16_t(this->data_[COMFOAIR_MSG_HEAD_LENGTH + start_index]);
   }
 
-  sensor::Sensor *fan_supply_air_percentage_;
-  sensor::Sensor *fan_exhaust_air_percentage_;
-  sensor::Sensor *fan_speed_air_;
-  sensor::Sensor *fan_speed_exhaust_;
-  sensor::Sensor *bypass_valve_percentage_;
-  sensor::BinarySensor *preheating_;
-  sensor::Sensor *temperature_outside_air_sensor_;
-  sensor::Sensor *temperature_supply_air_sensor_;
-  sensor::Sensor *temperature_exhaust_air_sensor_;
-  sensor::Sensor *temperature_continued_air_;
-  sensor::Sensor *temperature_enthalpy_sensor_;
-  sensor::Sensor *temperature_ewt_sensor_;
-  sensor::Sensor *temperature_reheating_sensor;
-  sensor::Sensor *temperature_kitchen_hood_sensor_;
-  sensor::BinarySensor *supply_air_fan_active_;
-
   uint8_t data_[30];
   uint8_t data_index_{0};
   uint8_t update_counter_{0};
@@ -575,6 +569,24 @@ class ComfoAirComponent : public PollingComponent, Climate, uart::UARTDevice {
   uint8_t bootloader_version_[13]{0};
   uint8_t firmware_version_[13]{0};
   uint8_t connector_board_version_[14]{0};
+
+public:
+	
+  sensor::Sensor *fan_supply_air_percentage_;
+  sensor::Sensor *fan_exhaust_air_percentage_;
+  sensor::Sensor *fan_speed_air_;
+  sensor::Sensor *fan_speed_exhaust_;
+  sensor::Sensor *bypass_valve_percentage_;
+  binary_sensor::BinarySensor *preheating_;
+  sensor::Sensor *temperature_outside_air_sensor_;
+  sensor::Sensor *temperature_supply_air_sensor_;
+  sensor::Sensor *temperature_exhaust_air_sensor_;
+  sensor::Sensor *temperature_continued_air_;
+  sensor::Sensor *temperature_enthalpy_sensor_;
+  sensor::Sensor *temperature_ewt_sensor_;
+  sensor::Sensor *temperature_reheating_sensor_;
+  sensor::Sensor *temperature_kitchen_hood_sensor_;
+  binary_sensor::BinarySensor *supply_air_fan_active_;
 };
 
 }  // namespace comfoair
