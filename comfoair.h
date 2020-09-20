@@ -315,6 +315,7 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
     }
     this->write_byte(COMFOAIR_MSG_PREFIX);
     this->write_byte(COMFOAIR_MSG_TAIL);
+    this->flush();
 }
 
   uint8_t comfoair_checksum_(const uint8_t *command_data, uint8_t length) const {
@@ -493,6 +494,7 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
 
         // comfort temperature
         this->target_temperature = msg[0] / 2 - 20;
+        this->current_temperature = msg[2] / 2 - 20;
 				this->publish_state();
 
         // T1 / outside air

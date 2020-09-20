@@ -33,6 +33,33 @@ climate:
   lambda: |-
     auto ca = new esphome::comfoair::ComfoAirComponent(id(uart_bus));
     App.register_component(ca);
+
+    ca->temperature_outside_air_sensor_ = new Sensor("Outside Air");
+    App.register_sensor(ca->temperature_outside_air_sensor_);
+    ca->temperature_supply_air_sensor_ = new Sensor("Supply Air");
+    App.register_sensor(ca->temperature_supply_air_sensor_);
+    ca->temperature_exhaust_air_sensor_ = new Sensor("Exhaust Air");
+    App.register_sensor(ca->temperature_exhaust_air_sensor_);
+    ca->temperature_continued_air_ = new Sensor("Continued Air");
+    App.register_sensor(ca->temperature_continued_air_);
+
+    ca->fan_supply_air_percentage_ = new Sensor("Fan Supply Air");
+    App.register_sensor(ca->fan_supply_air_percentage_);
+    ca->fan_exhaust_air_percentage_ = new Sensor("Fan Exhaust Air");
+    App.register_sensor(ca->fan_exhaust_air_percentage_);
+    ca->fan_speed_air_ = new Sensor("Incoming Air Speed");
+    App.register_sensor(ca->fan_speed_air_);
+    ca->fan_speed_exhaust_ = new Sensor("Exhaust Air Speed");
+    App.register_sensor(ca->fan_speed_exhaust_);
+
+    ca->bypass_valve_percentage_ = new Sensor("Bypass Valve");
+    App.register_sensor(ca->bypass_valve_percentage_);
+    ca->preheating_ = new BinarySensor("Preheating");
+    App.register_binary_sensor(ca->preheating_);
+
+    ca->supply_air_fan_active_ = new BinarySensor("Supply Air");
+    App.register_binary_sensor(ca->supply_air_fan_active_);
+
     App.register_climate(ca);
     return {ca};
 
