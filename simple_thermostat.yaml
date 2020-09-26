@@ -1,27 +1,3 @@
-type: 'custom:simple-thermostat'
-entity: "put-yout-comfoair-name-here"
-step_layout: row
-step_size: 1
-hide:
-  temperature: true
-sensors:
-  - entity: sensor.outside_air
-    unit: °C
-    name: Outside Air
-  - entity: sensor.supply_air
-    name: Supply Air
-    unit: °C
-  - entity: sensor.exhaust_air
-    name: Exhaust Air
-    unit: °C
-  - entity: sensor.continued_air
-    name: Continued Air
-    unit: °C
-  - entity: binary_sensor.preheating
-    name: Preheating
-  - entity: sensor.bypass_valve
-    name: Bypass Valve
-    unit: '%'
 control:
   fan:
     - auto
@@ -29,3 +5,26 @@ control:
     - low
     - medium
     - high
+entity: 'climate.put-your-comfoair-name-here'
+hide:
+  temperature: true
+sensors:
+  - entity: sensor.outside_air
+    name: Outside Air
+    unit: °C
+  - entity: sensor.supply_air
+    name: Supply Air
+    unit: °C
+  - entity: sensor.return_air
+    name: Return Air
+    unit: °C
+  - entity: sensor.exhaust_air
+    name: Exhaust Air
+    unit: °C
+  - entity: binary_sensor.preheating
+    name: Preheating
+  - entity: binary_sensor.bypass_valve
+    name: Bypass Valve
+step_layout: row
+step_size: 1
+type: 'custom:simple-thermostat'
