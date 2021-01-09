@@ -10,7 +10,7 @@ control:
     'off':
       name: 'off'
 decimals: 1
-entity: climate.zehnder_stork_whr_950
+entity: climate.put-yout-comfoair-name-here
 hide:
   temperature: true
 sensors:
