@@ -44,10 +44,6 @@ sensors:
     name: Bypass Valve
   - entity: binary_sensor.filter_full
     name: Filter Full
-  - entity: sensor.particulate_matter_10_0um_concentration
-    name: Particulate Matter <10.0µm
-  - entity: sensor.particulate_matter_2_5um_concentration
-    name: Particulate Matter <2.5µm
 step_layout: row
 step_size: 0.5
 style: |
