@@ -1,30 +1,61 @@
 control:
   fan:
-    - auto
-    - 'off'
-    - low
-    - medium
-    - high
-entity: 'climate.put-your-comfoair-name-here'
+    auto: false
+    high:
+      icon: 'mdi:fan-speed-3'
+    low:
+      icon: 'mdi:fan-speed-1'
+    medium:
+      icon: 'mdi:fan-speed-2'
+    'off':
+      name: 'off'
+decimals: 1
+entity: climate.zehnder_stork_whr_950
 hide:
   temperature: true
 sensors:
   - entity: sensor.outside_air
     name: Outside Air
-    unit: °C
+    unit: Â°C
   - entity: sensor.supply_air
     name: Supply Air
-    unit: °C
+    unit: Â°C
   - entity: sensor.return_air
     name: Return Air
-    unit: °C
+    unit: Â°C
   - entity: sensor.exhaust_air
     name: Exhaust Air
-    unit: °C
+    unit: Â°C
+  - entity: sensor.supply_air_level
+    name: Supply Air Level
+    unit: '%'
+  - entity: sensor.fan_speed_supply
+    name: Supply Speed
+    unit: rpm
+  - entity: sensor.return_air_level
+    name: Return Air Level
+    unit: '%'
+  - entity: sensor.fan_speed_exhaust
+    name: Exhaust Speed
+    unit: rpm
   - entity: binary_sensor.preheating
     name: Preheating
   - entity: binary_sensor.bypass_valve
     name: Bypass Valve
+  - entity: binary_sensor.filter_full
+    name: Filter Full
+  - entity: sensor.particulate_matter_10_0um_concentration
+    name: Particulate Matter <10.0Âµm
+  - entity: sensor.particulate_matter_2_5um_concentration
+    name: Particulate Matter <2.5Âµm
 step_layout: row
-step_size: 1
+step_size: 0.5
+style: |
+  ha-card {
+    --st-font-size-xl: 14px;
+    --st-font-size-m: 10px;
+    --st-font-size-title: 20px;
+    --st-font-size-sensors: 10px;
+    --st-spacing: 2px;
+  }
 type: 'custom:simple-thermostat'
