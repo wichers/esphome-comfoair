@@ -35,17 +35,27 @@ climate:
     App.register_component(ca);
 
     ca->outside_air_temperature = new Sensor("Outside Air");
+    ca->outside_air_temperature->set_unit_of_measurement("°C");
+    ca->outside_air_temperature->set_accuracy_decimals(1);
     App.register_sensor(ca->outside_air_temperature);
     ca->supply_air_temperature = new Sensor("Supply Air");
+    ca->supply_air_temperature->set_unit_of_measurement("°C");
+    ca->supply_air_temperature->set_accuracy_decimals(1);
     App.register_sensor(ca->supply_air_temperature);
     ca->return_air_temperature = new Sensor("Return Air");
+    ca->return_air_temperature->set_unit_of_measurement("°C");
+    ca->return_air_temperature->set_accuracy_decimals(1);
     App.register_sensor(ca->return_air_temperature);
     ca->exhaust_air_temperature = new Sensor("Exhaust Air");
+    ca->exhaust_air_temperature->set_unit_of_measurement("°C");
+    ca->exhaust_air_temperature->set_accuracy_decimals(1);
     App.register_sensor(ca->exhaust_air_temperature);
 
     ca->fan_supply_air_percentage = new Sensor("Fan Supply Air");
+    ca->fan_supply_air_percentage->set_unit_of_measurement("%");
     App.register_sensor(ca->fan_supply_air_percentage);
     ca->fan_exhaust_air_percentage = new Sensor("Fan Exhaust Air");
+    ca->fan_exhaust_air_percentage->set_unit_of_measurement("%");
     App.register_sensor(ca->fan_exhaust_air_percentage);
     ca->fan_speed_supply = new Sensor("Fan Speed Supply");
     App.register_sensor(ca->fan_speed_supply);
