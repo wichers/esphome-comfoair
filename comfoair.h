@@ -159,7 +159,7 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
       int level;
 
       this->fan_mode = *call.get_fan_mode();
-      switch (this->fan_mode) {
+      switch (this->fan_mode.value()) {
         case climate::CLIMATE_FAN_HIGH:
           level = 0x04;
           break;
