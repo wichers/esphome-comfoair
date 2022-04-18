@@ -108,8 +108,8 @@ static const uint8_t COMFOAIR_SET_COMFORT_TEMPERATURE_REQUEST = 0xd3;
 static const uint8_t COMFOAIR_SET_COMFORT_TEMPERATURE_LENGTH = 0x01;
 static const uint8_t COMFOAIR_SET_MAIN_STATUS_REQUEST = 0xd7;
 static const uint8_t COMFOAIR_SET_MAIN_STATUS_LENGTH = 0x08;
-static const uint8_t COMFOAIR_SET_RESET_SELFTEST_REQUEST = 0xdb;
-static const uint8_t COMFOAIR_SET_RESET_SELFTEST_LENGTH = 0x04;
+static const uint8_t COMFOAIR_SET_RESET_REQUEST = 0xdb;
+static const uint8_t COMFOAIR_SET_RESET_LENGTH = 0x04;
 static const uint8_t COMFOAIR_SET_EWT_REHEATER_REQUEST = 0xed;
 static const uint8_t COMFOAIR_SET_EWT_REHEATER_LENGTH = 0x05;
 
@@ -124,7 +124,7 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
  public:
 
   // Poll every 600ms
-  ComfoAirComponent(UARTComponent *parent) : PollingComponent(600), UARTDevice(parent) { }
+  ComfoAirComponent(UARTComponent *parent) : Climate("comfoair"), PollingComponent(600), UARTDevice(parent) { }
 
   /// Return the traits of this controller.
   climate::ClimateTraits traits() override {
@@ -142,6 +142,7 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
     traits.set_visual_max_temperature(29);
     traits.set_visual_temperature_step(1);
     traits.set_supported_fan_modes({
+      climate::CLIMATE_FAN_FOCUS,
       climate::CLIMATE_FAN_AUTO,
       climate::CLIMATE_FAN_LOW,
       climate::CLIMATE_FAN_MEDIUM,
@@ -158,6 +159,10 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
 
       this->fan_mode = *call.get_fan_mode();
       switch (this->fan_mode.value()) {
+        case climate::CLIMATE_FAN_FOCUS:
+          level = 0x05;
+          break;
+
         case climate::CLIMATE_FAN_HIGH:
           level = 0x04;
           break;
@@ -175,7 +180,6 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
           break;
         case climate::CLIMATE_FAN_ON:
         case climate::CLIMATE_FAN_MIDDLE:
-        case climate::CLIMATE_FAN_FOCUS:
         case climate::CLIMATE_FAN_DIFFUSE:
         default:
           level = -1;
@@ -278,10 +282,15 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
 
   float get_setup_priority() const override { return setup_priority::DATA; }
 
+  void reset_filter(void) {
+    uint8_t reset_cmd[COMFOAIR_SET_RESET_LENGTH] = {0, 0, 0, 1};
+    this->write_command_(COMFOAIR_SET_RESET_REQUEST, reset_cmd, sizeof(reset_cmd));
+	}
+
  protected:
 
   void set_level_(int level) {
-    if (level < 0 || level > 4) {
+    if (level < 0 || level > 5) {
       ESP_LOGI(TAG, "Ignoring invalid level request: %i", level);
       return;
     }
@@ -370,6 +379,7 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
       // checksum is without checksum bytes
       uint8_t checksum = comfoair_checksum_(this->data_ + 2, COMFOAIR_MSG_HEAD_LENGTH + data_length - 2);
       if (checksum != byte) {
+        //ESP_LOGW(TAG, "%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X", this->data_[0], this->data_[1], this->data_[2], this->data_[3], this->data_[4], this->data_[5], this->data_[6], this->data_[7], this->data_[8], this->data_[9], this->data_[10]);
         ESP_LOGW(TAG, "ComfoAir Checksum doesn't match: 0x%02X!=0x%02X", byte, checksum);
         return false;
       }
@@ -639,7 +649,6 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
   uint8_t connector_board_version_[14]{0};
 
 public:
-
   sensor::Sensor *fan_supply_air_percentage{nullptr};
   sensor::Sensor *fan_exhaust_air_percentage{nullptr};
   sensor::Sensor *fan_speed_supply{nullptr};
