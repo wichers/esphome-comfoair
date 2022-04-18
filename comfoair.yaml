@@ -52,15 +52,20 @@ climate:
     ca->fan_speed_exhaust = new Sensor("Comfoair Fan Speed Exhaust");
     App.register_sensor(ca->fan_speed_exhaust);
 
-    ca->is_bypass_valve_open = new BinarySensor("Comfoair Bypass Valve");
+    ca->is_bypass_valve_open = new BinarySensor();
+    ca->is_bypass_valve_open->set_name("Comfoair Bypass Valve");
     App.register_binary_sensor(ca->is_bypass_valve_open);
-    ca->is_preheating = new BinarySensor("Comfoair Preheating");
+    ca->is_preheating = new BinarySensor();
+    ca->is_preheating->set_name("Comfoair Preheating");
     App.register_binary_sensor(ca->is_preheating);
-    ca->is_supply_fan_active = new BinarySensor("Comfoair Supply Fan");
+    ca->is_supply_fan_active = new BinarySensor();
+    ca->is_supply_fan_active->set_name("Comfoair Supply Fan");
     App.register_binary_sensor(ca->is_supply_fan_active);
-    ca->is_filter_full = new BinarySensor("Comfoair Filter Full");
+    ca->is_filter_full = new BinarySensor();
+    ca->is_filter_full->set_name("Comfoair Filter Full");
     App.register_binary_sensor(ca->is_filter_full);
-    ca->is_summer_mode = new BinarySensor("Comfoair Summer Mode");
+    ca->is_summer_mode = new BinarySensor();
+    ca->is_summer_mode->set_name("Comfoair Summer Mode");
     App.register_binary_sensor(ca->is_summer_mode);
 
     ca->return_air_level = new Sensor("Comfoair Return Air Level");
