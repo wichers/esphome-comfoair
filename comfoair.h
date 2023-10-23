@@ -124,7 +124,7 @@ class ComfoAirComponent : public climate::Climate, PollingComponent, uart::UARTD
  public:
 
   // Poll every 600ms
-  ComfoAirComponent(UARTComponent *parent) : Climate("comfoair"), PollingComponent(600), UARTDevice(parent) { }
+  ComfoAirComponent(UARTComponent *parent) : Climate(), PollingComponent(600), UARTDevice(parent) { }
 
   /// Return the traits of this controller.
   climate::ClimateTraits traits() override {
