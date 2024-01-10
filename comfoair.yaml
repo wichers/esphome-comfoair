@@ -34,43 +34,89 @@ climate:
     auto ca = new esphome::comfoair::ComfoAirComponent(id(uart_bus));
     App.register_component(ca);
 
-    ca->outside_air_temperature = new Sensor("Comfoair Outside Air");
+    ca->outside_air_temperature = new Sensor();
     App.register_sensor(ca->outside_air_temperature);
-    ca->supply_air_temperature = new Sensor("Comfoair Supply Air");
-    App.register_sensor(ca->supply_air_temperature);
-    ca->return_air_temperature = new Sensor("Comfoair Return Air");
-    App.register_sensor(ca->return_air_temperature);
-    ca->exhaust_air_temperature = new Sensor("Comfoair Exhaust Air");
-    App.register_sensor(ca->exhaust_air_temperature);
+    ca->outside_air_temperature->set_object_id("Comfoair Outside Air Temperature");
+    ca->outside_air_temperature->set_name("Comfoair Outside Air");
+    ca->outside_air_temperature->set_unit_of_measurement("°C");
+    ca->outside_air_temperature->set_accuracy_decimals(1);
 
-    ca->fan_supply_air_percentage = new Sensor("Comfoair Fan Supply Air");
+    ca->supply_air_temperature = new Sensor();
+    App.register_sensor(ca->supply_air_temperature);
+    ca->supply_air_temperature->set_object_id("Comfoair Supply Air Temperature");
+    ca->supply_air_temperature->set_name("Comfoair Supply Air");
+    ca->supply_air_temperature->set_unit_of_measurement("°C");
+    ca->supply_air_temperature->set_accuracy_decimals(1);
+
+    ca->return_air_temperature = new Sensor();
+    App.register_sensor(ca->return_air_temperature);
+    ca->return_air_temperature->set_object_id("Comfoair Return Air Temperature");
+    ca->return_air_temperature->set_name("Comfoair Return Air");
+    ca->return_air_temperature->set_unit_of_measurement("°C");
+    ca->return_air_temperature->set_accuracy_decimals(1);
+
+    ca->exhaust_air_temperature = new Sensor();
+    App.register_sensor(ca->exhaust_air_temperature);
+    ca->exhaust_air_temperature->set_object_id("Comfoair Exhaust Air Temperature");
+    ca->exhaust_air_temperature->set_name("Comfoair Exhaust Air");
+    ca->exhaust_air_temperature->set_unit_of_measurement("°C");
+    ca->exhaust_air_temperature->set_accuracy_decimals(1);
+
+    ca->fan_supply_air_percentage = new Sensor();
     App.register_sensor(ca->fan_supply_air_percentage);
-    ca->fan_exhaust_air_percentage = new Sensor("Comfoair Fan Exhaust Air");
+    ca->fan_supply_air_percentage->set_object_id("Comfoair Supply Air Percentage");
+    ca->fan_supply_air_percentage->set_name("Comfoair Fan Supply Air");
+    ca->fan_supply_air_percentage->set_unit_of_measurement("%");
+
+    ca->fan_exhaust_air_percentage = new Sensor();
     App.register_sensor(ca->fan_exhaust_air_percentage);
-    ca->fan_speed_supply = new Sensor("Comfoair Fan Speed Supply");
+    ca->fan_exhaust_air_percentage->set_object_id("Comfoair Fan Exhaust Air Percentage");
+    ca->fan_exhaust_air_percentage->set_name("Comfoair Fan Exhaust Air");
+    ca->fan_exhaust_air_percentage->set_unit_of_measurement("%");
+
+    ca->fan_speed_supply = new Sensor();
     App.register_sensor(ca->fan_speed_supply);
-    ca->fan_speed_exhaust = new Sensor("Comfoair Fan Speed Exhaust");
+    ca->fan_speed_supply->set_object_id("Comfoair Fan Speed Supply");
+    ca->fan_speed_supply->set_name("Comfoair Fan Speed Supply");
+
+    ca->fan_speed_exhaust = new Sensor();
     App.register_sensor(ca->fan_speed_exhaust);
+    ca->fan_speed_exhaust->set_object_id("Comfoair Fan Speed Exhaust");
+    ca->fan_speed_exhaust->set_name("Comfoair Fan Speed exhaust");
 
     ca->is_bypass_valve_open = new BinarySensor();
-    ca->is_bypass_valve_open->set_name("Comfoair Bypass Valve");
     App.register_binary_sensor(ca->is_bypass_valve_open);
+    ca->is_bypass_valve_open->set_object_id("Comfoair Bypass Valve");
+    ca->is_bypass_valve_open->set_name("Comfoair Bypass Valve");
+
     ca->is_preheating = new BinarySensor();
+    ca->is_preheating->set_object_id("Comfoair Preheating");
     ca->is_preheating->set_name("Comfoair Preheating");
     App.register_binary_sensor(ca->is_preheating);
+
     ca->is_supply_fan_active = new BinarySensor();
+    ca->is_supply_fan_active->set_object_id("Comfoair Supply Fan");
     ca->is_supply_fan_active->set_name("Comfoair Supply Fan");
     App.register_binary_sensor(ca->is_supply_fan_active);
+
     ca->is_filter_full = new BinarySensor();
+    ca->is_filter_full->set_object_id("Comfoair Filter Full");
     ca->is_filter_full->set_name("Comfoair Filter Full");
     App.register_binary_sensor(ca->is_filter_full);
+
     ca->is_summer_mode = new BinarySensor();
+    ca->is_summer_mode->set_object_id("Comfoair is Summer Mode");
     ca->is_summer_mode->set_name("Comfoair Summer Mode");
     App.register_binary_sensor(ca->is_summer_mode);
 
-    ca->return_air_level = new Sensor("Comfoair Return Air Level");
+    ca->return_air_level = new Sensor();
+    ca->return_air_level->set_object_id("Comfoair Return Air Level");
+    ca->return_air_level->set_name("Comfoair Return Air Level");
     App.register_sensor(ca->return_air_level);
-    ca->supply_air_level = new Sensor("Comfoair Supply Air Level");
+
+    ca->supply_air_level = new Sensor();
+    ca->supply_air_level->set_object_id("Comfoair Supply Air Level");
+    ca->supply_air_level->set_name("Comfoair Supply Air Level");
     App.register_sensor(ca->supply_air_level);
 
     App.register_climate(ca);
