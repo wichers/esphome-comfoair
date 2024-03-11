@@ -32,7 +32,7 @@ uart:
   id: uart_bus
   baud_rate: 9600
   tx_pin: TX
-  rx_pin: RX 
+  rx_pin: RX
 
 comfoair:
   name: "ComfoAir 350"
@@ -46,9 +46,9 @@ comfoair:
   fan_speed_exhaust:
     name: "Exhaust fan speed"
   is_bypass_valve_open:
-    name: "Is bypas open?"
+    name: "Is bypass open?"
   is_preheating:
-    name: "is preheating active?"
+    name: "Is preheating active?"
   outside_air_temperature:
     name: "Outside temperature"
   supply_air_temperature:
