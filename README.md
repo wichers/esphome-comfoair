@@ -29,9 +29,9 @@ comfoair:
   fan_speed_exhaust:
     name: "Exhaust fan speed"
   is_bypass_valve_open:
-    name: "Is bypas open?"
+    name: "Is bypass open?"
   is_preheating:
-    name: "is preheating active?"
+    name: "Is preheating active?"
   outside_air_temperature:
     name: "Outside temperature"
   supply_air_temperature:
@@ -69,7 +69,7 @@ comfoair:
 The sensor defined here is a full list of sensor - if you remove sensor from yaml it will be not monitored.
 
 
-For visualization: 
+For visualization:
 
 Have a look at simple_thermostat.yaml and https://github.com/nervetattoo/simple-thermostat
 
