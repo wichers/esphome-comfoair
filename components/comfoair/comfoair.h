@@ -94,7 +94,7 @@ class ComfoAirClimate : public climate::Climate {
   }
 
  protected:
-    ComfoAirComponentBase comfoair_;
+    ComfoAirComponentBase *comfoair_;
 };
 
 class ComfoAirComponent : public ComfoAirComponentBase, PollingComponent, uart::UARTDevice {
