@@ -21,7 +21,7 @@ class ComfoAirComponentBase {
 class ComfoAirClimate : public climate::Climate {
  public:
 
-  ComfoAirClimate(ComfoAirComponentBase comfoair) : Climate(), comfoair_(comfoair) {
+  ComfoAirClimate(ComfoAirComponentBase *comfoair) : Climate(), comfoair_(comfoair) {
     this->set_name("comfoair");
   }
 
