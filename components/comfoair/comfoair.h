@@ -194,9 +194,7 @@ class ComfoAirComponent : public ComfoAirComponentBase, PollingComponent, uart::
   void set_name(const char* value) {this->name = value;}
   void set_uart_component(uart::UARTComponent *parent) {this->set_uart_parent(parent);}
 
-protected:
-
-  void set_level_(int level) {
+  void set_level(int level) {
     if (level < 0 || level > 5) {
       ESP_LOGI(TAG, "Ignoring invalid level request: %i", level);
       return;
@@ -209,7 +207,7 @@ protected:
     }
   }
 
-  void set_comfort_temperature_(float temperature) {
+  void set_comfort_temperature(float temperature) {
     if (temperature < 12.0f || temperature > 29.0f) {
       ESP_LOGI(TAG, "Ignoring invalid temperature request: %i", temperature);
       return;
@@ -221,6 +219,8 @@ protected:
       this->write_command_(COMFOAIR_SET_COMFORT_TEMPERATURE_REQUEST, command, sizeof(command));
     }
   }
+
+protected:
 
   void write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length) {
     this->write_byte(COMFOAIR_MSG_PREFIX);
