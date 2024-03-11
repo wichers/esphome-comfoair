@@ -5,6 +5,12 @@ esphome:
   includes:
     - comfoair.h
 
+external_components:
+  - source:
+      type: git
+      url: https://github.com/wichers/esphome-comfoair
+    components: [comfoair]
+
 wifi:
   ssid: 'your-wifi-ssid-here'
   password: 'put-your-wifi-password-here'
@@ -28,53 +34,50 @@ uart:
   tx_pin: TX
   rx_pin: RX 
 
-climate:
-- platform: custom
-  lambda: |-
-    auto ca = new esphome::comfoair::ComfoAirComponent(id(uart_bus));
-    App.register_component(ca);
-
-    ca->outside_air_temperature = new Sensor("Comfoair Outside Air");
-    App.register_sensor(ca->outside_air_temperature);
-    ca->supply_air_temperature = new Sensor("Comfoair Supply Air");
-    App.register_sensor(ca->supply_air_temperature);
-    ca->return_air_temperature = new Sensor("Comfoair Return Air");
-    App.register_sensor(ca->return_air_temperature);
-    ca->exhaust_air_temperature = new Sensor("Comfoair Exhaust Air");
-    App.register_sensor(ca->exhaust_air_temperature);
-
-    ca->fan_supply_air_percentage = new Sensor("Comfoair Fan Supply Air");
-    App.register_sensor(ca->fan_supply_air_percentage);
-    ca->fan_exhaust_air_percentage = new Sensor("Comfoair Fan Exhaust Air");
-    App.register_sensor(ca->fan_exhaust_air_percentage);
-    ca->fan_speed_supply = new Sensor("Comfoair Fan Speed Supply");
-    App.register_sensor(ca->fan_speed_supply);
-    ca->fan_speed_exhaust = new Sensor("Comfoair Fan Speed Exhaust");
-    App.register_sensor(ca->fan_speed_exhaust);
-
-    ca->is_bypass_valve_open = new BinarySensor();
-    ca->is_bypass_valve_open->set_name("Comfoair Bypass Valve");
-    App.register_binary_sensor(ca->is_bypass_valve_open);
-    ca->is_preheating = new BinarySensor();
-    ca->is_preheating->set_name("Comfoair Preheating");
-    App.register_binary_sensor(ca->is_preheating);
-    ca->is_supply_fan_active = new BinarySensor();
-    ca->is_supply_fan_active->set_name("Comfoair Supply Fan");
-    App.register_binary_sensor(ca->is_supply_fan_active);
-    ca->is_filter_full = new BinarySensor();
-    ca->is_filter_full->set_name("Comfoair Filter Full");
-    App.register_binary_sensor(ca->is_filter_full);
-    ca->is_summer_mode = new BinarySensor();
-    ca->is_summer_mode->set_name("Comfoair Summer Mode");
-    App.register_binary_sensor(ca->is_summer_mode);
-
-    ca->return_air_level = new Sensor("Comfoair Return Air Level");
-    App.register_sensor(ca->return_air_level);
-    ca->supply_air_level = new Sensor("Comfoair Supply Air Level");
-    App.register_sensor(ca->supply_air_level);
-
-    App.register_climate(ca);
-    return {ca};
-    
-  climates:
-    - name: "put-yout-comfoair-name-here"
+comfoair:
+  name: "ComfoAir 350"
+  uart_id: uart_bus
+  fan_supply_air_percentage:
+    name: "Fan supply (%)"
+  fan_exhaust_air_percentage:
+    name: "Fan exhaust (%)"
+  fan_speed_supply:
+    name: "Supply fan speed"
+  fan_speed_exhaust:
+    name: "Exhaust fan speed"
+  is_bypass_valve_open:
+    name: "Is bypas open?"
+  is_preheating:
+    name: "is preheating active?"
+  outside_air_temperature:
+    name: "Outside temperature"
+  supply_air_temperature:
+    name: "Supply temperature"
+  return_air_temperature:
+    name: "Return temperature"
+  exhaust_air_temperature:
+    name: "Exhaust temperature"
+  enthalpy_temperature:
+    name: "Enthalpy temperature"
+  ewt_temperature:
+    name: "EWT temperature "
+  reheating_temperature:
+    name: "Reheating temperature"
+  kitchen_hood_temperature:
+    name: "Kitchen hood temperature"
+  return_air_level:
+    name: "Return level"
+  supply_air_level:
+    name: "Supply level"
+  is_supply_fan_active:
+    name: "Is supply fan active?"
+  is_filter_full:
+    name: "Is filter full?"
+  bypass_factor:
+    name: "Bypass factor"
+  bypass_step:
+    name: "Bypass step"
+  bypass_correction:
+    name: "Bypass correction"
+  is_summer_mode:
+    name: "Is summer mode?"
