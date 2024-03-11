@@ -10,20 +10,14 @@
 
 namespace esphome {
 namespace comfoair {
+class ComfoAirComponent : public climate::Climate, public PollingComponent, public uart::UARTDevice {
+public:
 
-// Base class
-class ComfoAirComponentBase {
-   public:
-      virtual void set_level(int level) = 0;
-      virtual void set_comfort_temperature(float temperature) = 0;
-};
-
-class ComfoAirClimate : public climate::Climate {
- public:
-
-  ComfoAirClimate(ComfoAirComponentBase *comfoair) : Climate(), comfoair_(comfoair) {
-    this->set_name("comfoair");
-  }
+  // Poll every 600ms
+  ComfoAirComponent() : 
+  Climate(), 
+  PollingComponent(600),
+  UARTDevice() { }
 
   /// Return the traits of this controller.
   climate::ClimateTraits traits() override {
@@ -35,18 +29,19 @@ class ComfoAirClimate : public climate::Climate {
     traits.set_supports_two_point_target_temperature(false);
     traits.set_supported_presets({
         climate::CLIMATE_PRESET_HOME,
-    });
+    }); 
     traits.set_supports_action(false);
     traits.set_visual_min_temperature(12);
     traits.set_visual_max_temperature(29);
-    traits.set_visual_temperature_step(1);
+    //traits.set_visual_tXComfoAirComponentemperature_step(1);
     traits.set_supported_fan_modes({
+      climate::CLIMATE_FAN_FOCUS,
       climate::CLIMATE_FAN_AUTO,
       climate::CLIMATE_FAN_LOW,
       climate::CLIMATE_FAN_MEDIUM,
       climate::CLIMATE_FAN_HIGH,
       climate::CLIMATE_FAN_OFF,
-    });
+    }); 
     return traits;
   }
 
@@ -57,6 +52,10 @@ class ComfoAirClimate : public climate::Climate {
 
       this->fan_mode = *call.get_fan_mode();
       switch (this->fan_mode.value()) {
+        case climate::CLIMATE_FAN_FOCUS:
+          level = 0x05;
+          break;
+
         case climate::CLIMATE_FAN_HIGH:
           level = 0x04;
           break;
@@ -81,27 +80,17 @@ class ComfoAirClimate : public climate::Climate {
       }
 
       if (level >= 0) {
-        this->comfoair_->set_level(level);
+        set_level_(level);
       }
 
     }
     if (call.get_target_temperature().has_value()) {
       this->target_temperature = *call.get_target_temperature();
-      this->comfoair_->set_comfort_temperature(this->target_temperature);
+      set_comfort_temperature_(this->target_temperature);
     }
 
     this->publish_state();
   }
-
- protected:
-    ComfoAirComponentBase *comfoair_;
-};
-
-class ComfoAirComponent : public ComfoAirComponentBase, PollingComponent, uart::UARTDevice {
- public:
-
-  // Poll every 600ms
-  ComfoAirComponent(UARTComponent *parent) : PollingComponent(600), UARTDevice(parent) {}
 
   void dump_config() override {
     uint8_t *p;
@@ -123,7 +112,7 @@ class ComfoAirComponent : public ComfoAirComponentBase, PollingComponent, uart::
     this->check_uart_settings(9600);
   }
 
-  void update() override {
+  void update()  {
     switch(update_counter_) {
       case -3:
         this->write_command_(COMFOAIR_GET_BOOTLOADER_VERSION_REQUEST, nullptr, 0);
@@ -194,7 +183,9 @@ class ComfoAirComponent : public ComfoAirComponentBase, PollingComponent, uart::
   void set_name(const char* value) {this->name = value;}
   void set_uart_component(uart::UARTComponent *parent) {this->set_uart_parent(parent);}
 
-  void set_level(int level) override {
+protected:
+
+  void set_level_(int level) {
     if (level < 0 || level > 5) {
       ESP_LOGI(TAG, "Ignoring invalid level request: %i", level);
       return;
@@ -207,7 +198,7 @@ class ComfoAirComponent : public ComfoAirComponentBase, PollingComponent, uart::
     }
   }
 
-  void set_comfort_temperature(float temperature) override {
+  void set_comfort_temperature_(float temperature) {
     if (temperature < 12.0f || temperature > 29.0f) {
       ESP_LOGI(TAG, "Ignoring invalid temperature request: %i", temperature);
       return;
@@ -219,8 +210,6 @@ class ComfoAirComponent : public ComfoAirComponentBase, PollingComponent, uart::
       this->write_command_(COMFOAIR_SET_COMFORT_TEMPERATURE_REQUEST, command, sizeof(command));
     }
   }
-
-protected:
 
   void write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length) {
     this->write_byte(COMFOAIR_MSG_PREFIX);
@@ -401,28 +390,28 @@ protected:
         // Fan Speed
         switch(msg[8]) {
           case 0x00:
-            this->comfoair_climate->fan_mode = climate::CLIMATE_FAN_AUTO;
-            this->comfoair_climate->mode = climate::CLIMATE_MODE_AUTO;
+            this->fan_mode = climate::CLIMATE_FAN_AUTO;
+            this->mode = climate::CLIMATE_MODE_AUTO;
             break;
           case 0x01:
-            this->comfoair_climate->fan_mode = climate::CLIMATE_FAN_OFF;
-            this->comfoair_climate->mode = climate::CLIMATE_MODE_OFF;
+            this->fan_mode = climate::CLIMATE_FAN_OFF;
+            this->mode = climate::CLIMATE_MODE_OFF;
             break;
           case 0x02:
-            this->comfoair_climate->fan_mode = climate::CLIMATE_FAN_LOW;
-            this->comfoair_climate->mode = climate::CLIMATE_MODE_FAN_ONLY;
+            this->fan_mode = climate::CLIMATE_FAN_LOW;
+            this->mode = climate::CLIMATE_MODE_FAN_ONLY;
             break;
           case 0x03:
-            this->comfoair_climate->fan_mode = climate::CLIMATE_FAN_MEDIUM;
-            this->comfoair_climate->mode = climate::CLIMATE_MODE_FAN_ONLY;
+            this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
+            this->mode = climate::CLIMATE_MODE_FAN_ONLY;
           break;
           case 0x04:
-            this->comfoair_climate->fan_mode = climate::CLIMATE_FAN_HIGH;
-            this->comfoair_climate->mode = climate::CLIMATE_MODE_FAN_ONLY;
+            this->fan_mode = climate::CLIMATE_FAN_HIGH;
+            this->mode = climate::CLIMATE_MODE_FAN_ONLY;
             break;
         }
 
-        this->comfoair_climate->publish_state();
+        this->publish_state();
 
         // Supply air fan active (1 = active / 0 = inactive)
         if (this->is_supply_fan_active != nullptr) {
@@ -439,9 +428,8 @@ protected:
       case COMFOAIR_GET_TEMPERATURES_RESPONSE: {
 
         // comfort temperature
-        this->comfoair_climate->target_temperature = (float) msg[0] / 2.0f - 20.0f;
-        this->comfoair_climate->current_temperature = (float) msg[2] / 2.0f - 20.0f;
-        this->comfoair_climate->publish_state();
+        this->target_temperature = (float) msg[0] / 2.0f - 20.0f;
+        this->publish_state();
 
         // T1 / outside air
         if (this->outside_air_temperature != nullptr && msg[5] & 0x01) {
@@ -454,6 +442,7 @@ protected:
         // T3 / exhaust air
         if (this->return_air_temperature != nullptr && msg[5] & 0x04) {
           this->return_air_temperature->publish_state((float) msg[3] / 2.0f - 20.0f);
+          this->current_temperature = (float) msg[3] / 2.0f - 20.0f;
         }
         // T4 / continued air
         if (this->exhaust_air_temperature != nullptr && msg[5] & 0x08) {
@@ -556,8 +545,7 @@ protected:
   uint8_t connector_board_version_[14]{0};
   const char* name{0};
 
-public:
-  ComfoAirClimate *comfoair_climate = new ComfoAirClimate(this);
+public: 
   sensor::Sensor *fan_supply_air_percentage{nullptr};
   sensor::Sensor *fan_exhaust_air_percentage{nullptr};
   sensor::Sensor *fan_speed_supply{nullptr};
