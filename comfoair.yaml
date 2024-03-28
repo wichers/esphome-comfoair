@@ -38,46 +38,46 @@ comfoair:
   name: "ComfoAir 350"
   uart_id: uart_bus
   fan_supply_air_percentage:
-    name: "Fan supply (%)"
+    name: "fan_supply_air_percentage"
   fan_exhaust_air_percentage:
-    name: "Fan exhaust (%)"
+    name: "fan_exhaust_air_percentage"
   fan_speed_supply:
-    name: "Supply fan speed"
+    name: "fan_speed_supply"
   fan_speed_exhaust:
-    name: "Exhaust fan speed"
+    name: "fan_speed_exhaust"
   is_bypass_valve_open:
-    name: "Is bypass open?"
+    name: "is_bypass_valve_open"
   is_preheating:
-    name: "Is preheating active?"
+    name: "is_preheating"
   outside_air_temperature:
-    name: "Outside temperature"
+    name: "outside_air_temperature"
   supply_air_temperature:
-    name: "Supply temperature"
+    name: "supply_air_temperature"
   return_air_temperature:
-    name: "Return temperature"
+    name: "return_air_temperature"
   exhaust_air_temperature:
-    name: "Exhaust temperature"
+    name: "exhaust_air_temperature"
   enthalpy_temperature:
-    name: "Enthalpy temperature"
+    name: "enthalpy_temperature"
   ewt_temperature:
-    name: "EWT temperature "
+    name: "ewt_temperature"
   reheating_temperature:
-    name: "Reheating temperature"
+    name: "reheating_temperature"
   kitchen_hood_temperature:
-    name: "Kitchen hood temperature"
+    name: "kitchen_hood_temperature"
   return_air_level:
-    name: "Return level"
+    name: "return_air_level"
   supply_air_level:
-    name: "Supply level"
+    name: "supply_air_level"
   is_supply_fan_active:
-    name: "Is supply fan active?"
+    name: "is_supply_fan_active"
   is_filter_full:
-    name: "Is filter full?"
+    name: "is_filter_full"
   bypass_factor:
-    name: "Bypass factor"
+    name: "bypass_factor"
   bypass_step:
-    name: "Bypass step"
+    name: "bypass_step"
   bypass_correction:
-    name: "Bypass correction"
+    name: "bypass_correction"
   is_summer_mode:
-    name: "Is summer mode?"
+    name: "is_summer_mode"
