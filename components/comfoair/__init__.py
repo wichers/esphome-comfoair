@@ -1,4 +1,5 @@
 """ Creates module ComfoAir """
+
 import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome.const import *
@@ -8,13 +9,14 @@ from esphome.components import sensor
 from esphome.components import binary_sensor
 from esphome.components import text_sensor
 from esphome import pins
-comfoair_ns = cg.esphome_ns.namespace('comfoair')
-ComfoAirComponent = comfoair_ns.class_('ComfoAirComponent', cg.Component)
 
-DEPENDENCIES=['uart']
-AUTO_LOAD = ['sensor', 'climate', 'binary_sensor', 'text_sensor']
+comfoair_ns = cg.esphome_ns.namespace("comfoair")
+ComfoAirComponent = comfoair_ns.class_("ComfoAirComponent", cg.Component)
+
+DEPENDENCIES = ["uart"]
+AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor"]
 REQUIRED_KEY_NAME = "name"
-CONF_HUB_ID = 'comfoair'
+CONF_HUB_ID = "comfoair"
 
 CONF_FAN_SUPPLY_AIR_PERCENTAGE = "fan_supply_air_percentage"
 CONF_FAN_EXHAUST_AIR_PERCENTAGE = "fan_exhaust_air_percentage"
@@ -66,107 +68,138 @@ helper_comfoair = {
         CONF_SUPPLY_FAN_ACTIVE,
         CONF_FILTER_FULL,
     ],
-    "text_sensor": []
+    "text_sensor": [],
 }
 
-comfoair_sensors_schemas = cv.Schema({
-cv.Optional(CONF_FAN_SUPPLY_AIR_PERCENTAGE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_SPEED,
-    unit_of_measurement=UNIT_PERCENT,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_FAN_EXHAUST_AIR_PERCENTAGE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_SPEED,
-    unit_of_measurement=UNIT_PERCENT,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_FAN_SPEED_SUPPLY): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_SPEED,
-    unit_of_measurement=UNIT_PERCENT,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_FAN_SPEED_EXHAUST): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_SPEED,
-    unit_of_measurement=UNIT_PERCENT,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_OUTSIDE_AIR_TEMPERATURE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_TEMPERATURE,
-    unit_of_measurement=UNIT_CELSIUS,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_SUPPLY_AIR_TEMPERATURE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_TEMPERATURE,
-    unit_of_measurement=UNIT_CELSIUS,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_RETURN_AIR_TEMPERATURE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_TEMPERATURE,
-    unit_of_measurement=UNIT_CELSIUS,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_EXHAUST_AIR_TEMPERATURE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_TEMPERATURE,
-    unit_of_measurement=UNIT_CELSIUS,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_ENTHALPY_TEMPERATURE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_TEMPERATURE,
-    unit_of_measurement=UNIT_CELSIUS,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_EWT_TEMPERATURE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_TEMPERATURE,
-    unit_of_measurement=UNIT_CELSIUS,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_REHEATING_TEMPERATURE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_TEMPERATURE,
-    unit_of_measurement=UNIT_CELSIUS,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_KITCHEN_HOOD_TEMPERATURE): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_TEMPERATURE,
-    unit_of_measurement=UNIT_CELSIUS,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_RETURN_AIR_LEVEL): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_VOLUME,
-    unit_of_measurement=UNIT_CUBIC_METER,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_SUPPLY_AIR_LEVEL): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_VOLUME,
-    unit_of_measurement=UNIT_CUBIC_METER,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_BYPASS_FACTOR): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_VOLUME,
-    unit_of_measurement=UNIT_PERCENT,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_BYPASS_STEP): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_VOLUME,
-    unit_of_measurement=UNIT_PERCENT,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_BYPASS_CORRECTION): sensor.sensor_schema(
-    device_class=DEVICE_CLASS_VOLUME,
-    unit_of_measurement=UNIT_PERCENT,
-    accuracy_decimals=1,
-    state_class=STATE_CLASS_MEASUREMENT).extend(),
-cv.Optional(CONF_BYPASS_VALVE_OPEN): binary_sensor.binary_sensor_schema(device_class=DEVICE_CLASS_EMPTY).extend(),
-cv.Optional(CONF_PREHEATING): binary_sensor.binary_sensor_schema(device_class=DEVICE_CLASS_EMPTY).extend(),
-cv.Optional(CONF_SUMMER_MODE): binary_sensor.binary_sensor_schema(device_class=DEVICE_CLASS_EMPTY).extend(),
-cv.Optional(CONF_SUPPLY_FAN_ACTIVE): binary_sensor.binary_sensor_schema(device_class=DEVICE_CLASS_EMPTY).extend(),
-cv.Optional(CONF_FILTER_FULL): binary_sensor.binary_sensor_schema(device_class=DEVICE_CLASS_EMPTY).extend(),
-})
+comfoair_sensors_schemas = cv.Schema(
+    {
+        cv.Optional(CONF_FAN_SUPPLY_AIR_PERCENTAGE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_SPEED,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_FAN_EXHAUST_AIR_PERCENTAGE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_SPEED,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_FAN_SPEED_SUPPLY): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_SPEED,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_FAN_SPEED_EXHAUST): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_SPEED,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_OUTSIDE_AIR_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_SUPPLY_AIR_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_RETURN_AIR_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_EXHAUST_AIR_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_ENTHALPY_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_EWT_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_REHEATING_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_KITCHEN_HOOD_TEMPERATURE): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_TEMPERATURE,
+            unit_of_measurement=UNIT_CELSIUS,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_RETURN_AIR_LEVEL): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_VOLUME,
+            unit_of_measurement=UNIT_CUBIC_METER,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_VOLUME,
+            unit_of_measurement=UNIT_CUBIC_METER,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_BYPASS_FACTOR): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_VOLUME,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_BYPASS_STEP): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_VOLUME,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_BYPASS_CORRECTION): sensor.sensor_schema(
+            device_class=DEVICE_CLASS_VOLUME,
+            unit_of_measurement=UNIT_PERCENT,
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ).extend(),
+        cv.Optional(CONF_BYPASS_VALVE_OPEN): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_PREHEATING): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_SUMMER_MODE): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_SUPPLY_FAN_ACTIVE): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_FILTER_FULL): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+    }
+)
 
 CONFIG_SCHEMA = cv.All(
-    cv.Schema( {
-        cv.GenerateID(CONF_ID): cv.declare_id(ComfoAirComponent),
-        cv.Required(REQUIRED_KEY_NAME): cv.string,
-    })
+    cv.Schema(
+        {
+            cv.GenerateID(CONF_ID): cv.declare_id(ComfoAirComponent),
+            cv.Required(REQUIRED_KEY_NAME): cv.string,
+        }
+    )
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(comfoair_sensors_schemas)
     .extend(cv.COMPONENT_SCHEMA)
@@ -181,19 +214,18 @@ def to_code(config):
     cg.add(var.set_name(config[REQUIRED_KEY_NAME]))
     paren = yield cg.get_variable(config[CONF_UART_ID])
     cg.add(var.set_uart_component(paren))
-    for k in helper_comfoair["sensor"]:
-        if k in config:
-            sens = yield sensor.new_sensor(config[k])
-            func = getattr(var, 'set_'+k)
-            cg.add(func(sens))
-    for k in helper_comfoair["binary_sensor"]:
-        if k in config:
-            sens = yield binary_sensor.new_binary_sensor(config[k])
-            func = getattr(var, 'set_'+k)
-            cg.add(func(sens))
-    for k in helper_comfoair["text_sensor"]:
-        if k in config:
-            sens = yield text_sensor.new_text_sensor(config[k])
-            func = getattr(var, 'set_'+k)
-            cg.add(func(sens))
+    for k in helper_comfoair:
+        for v in helper_comfoair[k]:
+            if not v in config:
+                continue
+            sens = None
+            if k == "sensor":
+                sens = yield sensor.new_sensor(config[v])
+            elif k == "binary_sensor":
+                sens = yield binary_sensor.new_binary_sensor(config[v])
+            elif k == "text_sensor":
+                sens = yield text_sensor.new_text_sensor(config[v])
+            if sens is not None:
+                func = getattr(var, "set_" + v)
+                cg.add(func(sens))
     cg.add(cg.App.register_climate(var))
