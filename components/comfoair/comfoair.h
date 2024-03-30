@@ -321,11 +321,11 @@ protected:
           break;
         }
       case COMFOAIR_GET_VALVE_STATUS_RESPONSE: {
-        if (this->is_bypass_valve_open != nullptr) {
-          this->is_bypass_valve_open->publish_state(msg[0] != 0);
+        if (this->bypass_valve_open != nullptr) {
+          this->bypass_valve_open->publish_state(msg[0] != 0);
         }
-        if (this->is_preheating != nullptr) {
-            this->is_preheating->publish_state(msg[1] != 0);
+        if (this->preheating != nullptr) {
+            this->preheating->publish_state(msg[1] != 0);
         }
         break;
       }
@@ -339,8 +339,8 @@ protected:
         if (this->bypass_correction != nullptr) {
           this->bypass_correction->publish_state(msg[4]);
         }
-        if (this->is_summer_mode != nullptr) {
-          this->is_summer_mode->publish_state(msg[6] != 0);
+        if (this->summer_mode != nullptr) {
+          this->summer_mode->publish_state(msg[6] != 0);
         }
         break;
       }
@@ -410,14 +410,14 @@ protected:
         this->publish_state();
 
         // Supply air fan active (1 = active / 0 = inactive)
-        if (this->is_supply_fan_active != nullptr) {
-          this->is_supply_fan_active->publish_state(msg[9] == 1);
+        if (this->supply_fan_active != nullptr) {
+          this->supply_fan_active->publish_state(msg[9] == 1);
         }
         break;
       }
       case COMFOAIR_GET_ERROR_STATE_RESPONSE: {
-        if (this->is_filter_full != nullptr) {
-          this->is_filter_full->publish_state(msg[8] != 0);
+        if (this->filter_full != nullptr) {
+          this->filter_full->publish_state(msg[8] != 0);
         }
         break;
       }
@@ -473,15 +473,15 @@ protected:
   }
 
   void get_valve_status_() {
-    if (this->is_bypass_valve_open != nullptr ||
-        this->is_preheating != nullptr) {
+    if (this->bypass_valve_open != nullptr ||
+        this->preheating != nullptr) {
       ESP_LOGD(TAG, "getting valve status");
       this->write_command_(COMFOAIR_GET_VALVE_STATUS_REQUEST, nullptr, 0);
     }
   }
 
   void get_error_status_() {
-    if (this->is_filter_full != nullptr) {
+    if (this->filter_full != nullptr) {
       ESP_LOGD(TAG, "getting error status");
       this->write_command_(COMFOAIR_GET_ERROR_STATE_REQUEST, nullptr, 0);
     }
@@ -491,7 +491,7 @@ protected:
     if (this->bypass_factor != nullptr ||
       this->bypass_step != nullptr ||
       this->bypass_correction != nullptr ||
-      this->is_summer_mode != nullptr) {
+      this->summer_mode != nullptr) {
       ESP_LOGD(TAG, "getting bypass control");
       this->write_command_(COMFOAIR_GET_BYPASS_CONTROL_REQUEST, nullptr, 0);
     }
@@ -559,18 +559,18 @@ public:
   sensor::Sensor *bypass_factor{nullptr};
   sensor::Sensor *bypass_step{nullptr};
   sensor::Sensor *bypass_correction{nullptr};
-  binary_sensor::BinarySensor *is_bypass_valve_open{nullptr};
-  binary_sensor::BinarySensor *is_preheating{nullptr};
-  binary_sensor::BinarySensor *is_summer_mode{nullptr};
-  binary_sensor::BinarySensor *is_supply_fan_active{nullptr};
-  binary_sensor::BinarySensor *is_filter_full{nullptr};
+  binary_sensor::BinarySensor *bypass_valve_open{nullptr};
+  binary_sensor::BinarySensor *preheating{nullptr};
+  binary_sensor::BinarySensor *summer_mode{nullptr};
+  binary_sensor::BinarySensor *supply_fan_active{nullptr};
+  binary_sensor::BinarySensor *filter_full{nullptr};
 
   void set_fan_supply_air_percentage(sensor::Sensor *fan_supply_air_percentage) {this->fan_supply_air_percentage = fan_supply_air_percentage;};
   void set_fan_exhaust_air_percentage(sensor::Sensor *fan_exhaust_air_percentage) {this->fan_exhaust_air_percentage =fan_exhaust_air_percentage; };
   void set_fan_speed_supply(sensor::Sensor *fan_speed_supply) {this->fan_speed_supply =fan_speed_supply; };
   void set_fan_speed_exhaust(sensor::Sensor *fan_speed_exhaust) {this->fan_speed_exhaust =fan_speed_exhaust; };
-  void set_is_bypass_valve_open(binary_sensor::BinarySensor *is_bypass_valve_open) {this->is_bypass_valve_open =is_bypass_valve_open; };
-  void set_is_preheating(binary_sensor::BinarySensor *is_preheating) {this->is_preheating =is_preheating; };
+  void set_bypass_valve_open(binary_sensor::BinarySensor *bypass_valve_open) {this->bypass_valve_open =bypass_valve_open; };
+  void set_preheating(binary_sensor::BinarySensor *preheating) {this->preheating =preheating; };
   void set_outside_air_temperature(sensor::Sensor *outside_air_temperature) {this->outside_air_temperature =outside_air_temperature; };
   void set_supply_air_temperature(sensor::Sensor *supply_air_temperature) {this->supply_air_temperature =supply_air_temperature; };
   void set_return_air_temperature(sensor::Sensor *return_air_temperature) {this->return_air_temperature =return_air_temperature; };
@@ -581,12 +581,12 @@ public:
   void set_kitchen_hood_temperature(sensor::Sensor *kitchen_hood_temperature) {this->kitchen_hood_temperature =kitchen_hood_temperature; };
   void set_return_air_level(sensor::Sensor *return_air_level) {this->return_air_level =return_air_level; };
   void set_supply_air_level(sensor::Sensor *supply_air_level) {this->supply_air_level =supply_air_level; };
-  void set_is_supply_fan_active(binary_sensor::BinarySensor *is_supply_fan_active) {this->is_supply_fan_active =is_supply_fan_active; };
-  void set_is_filter_full(binary_sensor::BinarySensor *is_filter_full) {this->is_filter_full =is_filter_full; };
+  void set_supply_fan_active(binary_sensor::BinarySensor *supply_fan_active) {this->supply_fan_active =supply_fan_active; };
+  void set_filter_full(binary_sensor::BinarySensor *filter_full) {this->filter_full =filter_full; };
   void set_bypass_factor(sensor::Sensor *bypass_factor) {this->bypass_factor = bypass_factor; };
   void set_bypass_step(sensor::Sensor *bypass_step) {this->bypass_step = bypass_step; };
   void set_bypass_correction(sensor::Sensor *bypass_correction) {this->bypass_correction = bypass_correction; };
-  void set_is_summer_mode(binary_sensor::BinarySensor *is_summer_mode) {this->is_summer_mode = is_summer_mode; };
+  void set_summer_mode(binary_sensor::BinarySensor *summer_mode) {this->summer_mode = summer_mode; };
 };
 
 }  // namespace comfoair
