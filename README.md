@@ -28,10 +28,10 @@ comfoair:
     name: "fan_speed_supply"
   fan_speed_exhaust:
     name: "fan_speed_exhaust"
-  is_bypass_valve_open:
-    name: "is_bypass_valve_open"
-  is_preheating:
-    name: "is_preheating"
+  bypass_valve_open:
+    name: "bypass_valve_open"
+  preheating:
+    name: "preheating"
   outside_air_temperature:
     name: "outside_air_temperature"
   supply_air_temperature:
@@ -52,18 +52,18 @@ comfoair:
     name: "return_air_level"
   supply_air_level:
     name: "supply_air_level"
-  is_supply_fan_active:
-    name: "is_supply_fan_active"
-  is_filter_full:
-    name: "is_filter_full"
+  supply_fan_active:
+    name: "supply_fan_active"
+  filter_full:
+    name: "filter_full"
   bypass_factor:
     name: "bypass_factor"
   bypass_step:
     name: "bypass_step"
   bypass_correction:
     name: "bypass_correction"
-  is_summer_mode:
-    name: "is_summer_mode"
+  summer_mode:
+    name: "summer_mode"
 ```
 
 The sensor defined here is a full list of sensor - if you remove sensor from yaml it will be not monitored.
