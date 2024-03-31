@@ -7,10 +7,13 @@
 #include "esphome/components/climate/climate_mode.h"
 #include "esphome/components/climate/climate_traits.h"
 #include "esphome/components/sensor/sensor.h"
-#include "messages.h"
+#include "registers.h"
 
 namespace esphome {
 namespace comfoair {
+
+static const char *TAG = "comfoair";
+
 class ComfoAirComponent : public climate::Climate, public PollingComponent, public uart::UARTDevice {
 public:
 
@@ -111,13 +114,13 @@ public:
   void update() override {
     switch(update_counter_) {
       case -3:
-        this->write_command_(COMFOAIR_GET_BOOTLOADER_VERSION_REQUEST, nullptr, 0);
+        this->write_command_(CMD_GET_BOOTLOADER_VERSION, nullptr, 0);
         break;
       case -2:
-        this->write_command_(COMFOAIR_GET_FIRMWARE_VERSION_REQUEST, nullptr, 0);
+        this->write_command_(CMD_GET_FIRMWARE_VERSION, nullptr, 0);
         break;
       case -1:
-        this->write_command_(COMFOAIR_GET_BOARD_VERSION_REQUEST, nullptr, 0);
+        this->write_command_(CMD_GET_CONNECTOR_BOARD_VERSION, nullptr, 0);
         break;
       case 0:
         get_fan_status_();
@@ -154,7 +157,7 @@ public:
       if (!check.has_value()) {
 
         // finished
-        if (this->data_[COMFOAIR_MSG_ACK_IDX] != COMFOAIR_MSG_ACK) {
+        if (this->data_[COMMAND_ID_ACK] != COMMAND_ACK) {
           this->parse_data_();
         }
         this->data_index_ = 0;
@@ -172,8 +175,8 @@ public:
   float get_setup_priority() const override { return setup_priority::DATA; }
 
   void reset_filter(void) {
-    uint8_t reset_cmd[COMFOAIR_SET_RESET_LENGTH] = {0, 0, 0, 1};
-    this->write_command_(COMFOAIR_SET_RESET_REQUEST, reset_cmd, sizeof(reset_cmd));
+    uint8_t reset_cmd[4] = {0, 0, 0, 1};
+    this->write_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
 	}
 
   void set_name(const char* value) {this->name = value;}
@@ -189,8 +192,8 @@ protected:
 
     ESP_LOGI(TAG, "Setting level to: %i", level);
     {
-      uint8_t command[COMFOAIR_SET_LEVEL_LENGTH] = {(uint8_t) level};
-      this->write_command_(COMFOAIR_SET_LEVEL_REQUEST, command, sizeof(command));
+      uint8_t command[1] = {(uint8_t) level};
+      this->write_command_(CMD_SET_LEVEL, command, sizeof(command));
     }
   }
 
@@ -202,14 +205,14 @@ protected:
 
     ESP_LOGI(TAG, "Setting temperature to: %i", temperature);
     {
-      uint8_t command[COMFOAIR_SET_COMFORT_TEMPERATURE_LENGTH] = {(uint8_t) ((temperature + 20.0f) * 2.0f)};
-      this->write_command_(COMFOAIR_SET_COMFORT_TEMPERATURE_REQUEST, command, sizeof(command));
+      uint8_t command[1] = {(uint8_t) ((temperature + 20.0f) * 2.0f)};
+      this->write_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
     }
   }
 
   void write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length) {
-    this->write_byte(COMFOAIR_MSG_PREFIX);
-    this->write_byte(COMFOAIR_MSG_HEAD);
+    this->write_byte(COMMAND_PREFIX);
+    this->write_byte(COMMAND_HEAD);
     this->write_byte(0x00);
     this->write_byte(command);
     this->write_byte(command_data_length);
@@ -219,8 +222,8 @@ protected:
     } else {
       this->write_byte(comfoair_checksum_(&command, 1));
     }
-    this->write_byte(COMFOAIR_MSG_PREFIX);
-    this->write_byte(COMFOAIR_MSG_TAIL);
+    this->write_byte(COMMAND_PREFIX);
+    this->write_byte(COMMAND_TAIL);
     this->flush();
 }
 
@@ -237,14 +240,14 @@ protected:
     uint8_t byte = this->data_[index];
 
     if (index == 0) {
-      return byte == COMFOAIR_MSG_PREFIX;
+      return byte == COMMAND_PREFIX;
     }
 
     if (index == 1) {
-      if (byte == COMFOAIR_MSG_ACK) {
+      if (byte == COMMAND_ACK) {
         return {};
       } else {
-        return byte == COMFOAIR_MSG_HEAD;
+        return byte == COMMAND_HEAD;
       }
     }
 
@@ -252,24 +255,24 @@ protected:
       return byte == 0x00;
     }
 
-    if (index < COMFOAIR_MSG_HEAD_LENGTH) {
+    if (index < COMMAND_LEN_HEAD) {
       return true;
     }
 
-    uint8_t data_length = this->data_[COMFOAIR_MSG_DATA_LENGTH_IDX];
+    uint8_t data_length = this->data_[COMMAND_IDX_DATA];
 
-    if ((COMFOAIR_MSG_HEAD_LENGTH + data_length + COMFOAIR_MSG_TAIL_LENGTH) > sizeof(this->data_)) {
+    if ((COMMAND_LEN_HEAD + data_length + COMMAND_LEN_TAIL) > sizeof(this->data_)) {
       ESP_LOGW(TAG, "ComfoAir message too large");
       return false;
     }
 
-    if (index < COMFOAIR_MSG_HEAD_LENGTH + data_length) {
+    if (index < COMMAND_LEN_HEAD + data_length) {
       return true;
     }
 
-    if (index == COMFOAIR_MSG_HEAD_LENGTH + data_length) {
+    if (index == COMMAND_LEN_HEAD + data_length) {
       // checksum is without checksum bytes
-      uint8_t checksum = comfoair_checksum_(this->data_ + 2, COMFOAIR_MSG_HEAD_LENGTH + data_length - 2);
+      uint8_t checksum = comfoair_checksum_(this->data_ + 2, COMMAND_LEN_HEAD + data_length - 2);
       if (checksum != byte) {
         //ESP_LOGW(TAG, "%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X", this->data_[0], this->data_[1], this->data_[2], this->data_[3], this->data_[4], this->data_[5], this->data_[6], this->data_[7], this->data_[8], this->data_[9], this->data_[10]);
         ESP_LOGW(TAG, "ComfoAir Checksum doesn't match: 0x%02X!=0x%02X", byte, checksum);
@@ -278,12 +281,12 @@ protected:
       return true;
     }
 
-    if (index == COMFOAIR_MSG_HEAD_LENGTH + data_length + 1) {
-      return byte == COMFOAIR_MSG_PREFIX;
+    if (index == COMMAND_LEN_HEAD + data_length + 1) {
+      return byte == COMMAND_PREFIX;
     }
 
-    if (index == COMFOAIR_MSG_HEAD_LENGTH + data_length + 2) {
-      if (byte != COMFOAIR_MSG_TAIL) {
+    if (index == COMMAND_LEN_HEAD + data_length + 2) {
+      if (byte != COMMAND_TAIL) {
         return false;
       }
     }
@@ -293,19 +296,19 @@ protected:
 
   void parse_data_() {
     this->status_clear_warning();
-    uint8_t *msg = &this->data_[COMFOAIR_MSG_HEAD_LENGTH];
+    uint8_t *msg = &this->data_[COMMAND_LEN_HEAD];
 
-    switch (this->data_[COMFOAIR_MSG_IDENTIFIER_IDX]) {
-      case COMFOAIR_GET_BOOTLOADER_VERSION_RESPONSE:
-        memcpy(bootloader_version_, msg, this->data_[COMFOAIR_MSG_DATA_LENGTH_IDX]);
+    switch (this->data_[COMMAND_IDX_MSG_ID]) {
+      case RES_GET_BOOTLOADER_VERSION:
+        memcpy(bootloader_version_, msg, this->data_[COMMAND_IDX_DATA]);
         break;
-      case COMFOAIR_GET_FIRMWARE_VERSION_RESPONSE:
-        memcpy(firmware_version_, msg, this->data_[COMFOAIR_MSG_DATA_LENGTH_IDX]);
+      case RES_GET_FIRMWARE_VERSION:
+        memcpy(firmware_version_, msg, this->data_[COMMAND_IDX_DATA]);
         break;
-      case COMFOAIR_GET_BOARD_VERSION_RESPONSE:
-        memcpy(connector_board_version_, msg, this->data_[COMFOAIR_MSG_DATA_LENGTH_IDX]);
+      case RES_GET_CONNECTOR_BOARD_VERSION:
+        memcpy(connector_board_version_, msg, this->data_[COMMAND_IDX_DATA]);
         break;
-      case COMFOAIR_GET_FAN_STATUS_RESPONSE: {
+      case RES_GET_FAN_STATUS: {
           if (this->fan_supply_air_percentage != nullptr) {
             this->fan_supply_air_percentage->publish_state(msg[0]);
           }
@@ -320,7 +323,7 @@ protected:
           }
           break;
         }
-      case COMFOAIR_GET_VALVE_STATUS_RESPONSE: {
+      case RES_GET_VALVE_STATUS: {
         if (this->bypass_valve_open != nullptr) {
           this->bypass_valve_open->publish_state(msg[0] != 0);
         }
@@ -329,7 +332,7 @@ protected:
         }
         break;
       }
-      case COMFOAIR_GET_BYPASS_CONTROL_RESPONSE: {
+      case RES_GET_BYPASS_CONTROL_STATUS: {
         if (this->bypass_factor != nullptr) {
           this->bypass_factor->publish_state(msg[2]);
         }
@@ -344,7 +347,7 @@ protected:
         }
         break;
       }
-      case COMFOAIR_GET_TEMPERATURE_RESPONSE: {
+      case RES_GET_TEMPERATURE_STATUS: {
 
         // T1 / outside air
         if (this->outside_air_temperature != nullptr) {
@@ -364,7 +367,7 @@ protected:
         }
         break;
       }
-      case COMFOAIR_GET_SENSOR_DATA_RESPONSE: {
+      case RES_GET_SENSOR_DATA: {
 
         if (this->enthalpy_temperature != nullptr) {
           this->enthalpy_temperature->publish_state((float) msg[0] / 2.0f - 20.0f);
@@ -372,7 +375,7 @@ protected:
 
         break;
       }
-      case COMFOAIR_GET_VENTILATION_LEVEL_RESPONSE: {
+      case RES_GET_VENTILATION_LEVEL: {
 
         ESP_LOGD(TAG, "Level %02x", msg[8]);
 
@@ -415,13 +418,13 @@ protected:
         }
         break;
       }
-      case COMFOAIR_GET_ERROR_STATE_RESPONSE: {
+      case RES_GET_FAULTS: {
         if (this->filter_full != nullptr) {
           this->filter_full->publish_state(msg[8] != 0);
         }
         break;
       }
-      case COMFOAIR_GET_TEMPERATURES_RESPONSE: {
+      case RES_GET_TEMPERATURES: {
 
         // comfort temperature
         this->target_temperature = (float) msg[0] / 2.0f - 20.0f;
@@ -468,7 +471,7 @@ protected:
         this->fan_speed_supply != nullptr ||
         this->fan_speed_exhaust != nullptr) {
       ESP_LOGD(TAG, "getting fan status");
-      this->write_command_(COMFOAIR_GET_FAN_STATUS_REQUEST, nullptr, 0);
+      this->write_command_(CMD_GET_FAN_STATUS, nullptr, 0);
     }
   }
 
@@ -476,14 +479,14 @@ protected:
     if (this->bypass_valve_open != nullptr ||
         this->preheating != nullptr) {
       ESP_LOGD(TAG, "getting valve status");
-      this->write_command_(COMFOAIR_GET_VALVE_STATUS_REQUEST, nullptr, 0);
+      this->write_command_(CMD_GET_VALVE_STATUS, nullptr, 0);
     }
   }
 
   void get_error_status_() {
     if (this->filter_full != nullptr) {
       ESP_LOGD(TAG, "getting error status");
-      this->write_command_(COMFOAIR_GET_ERROR_STATE_REQUEST, nullptr, 0);
+      this->write_command_(CMD_GET_FAULTS, nullptr, 0);
     }
   }
 
@@ -493,7 +496,7 @@ protected:
       this->bypass_correction != nullptr ||
       this->summer_mode != nullptr) {
       ESP_LOGD(TAG, "getting bypass control");
-      this->write_command_(COMFOAIR_GET_BYPASS_CONTROL_REQUEST, nullptr, 0);
+      this->write_command_(CMD_GET_BYPASS_CONTROL_STATUS, nullptr, 0);
     }
   }
 
@@ -503,33 +506,33 @@ protected:
       this->return_air_temperature != nullptr ||
       this->outside_air_temperature != nullptr) {
       ESP_LOGD(TAG, "getting temperature");
-      this->write_command_(COMFOAIR_GET_TEMPERATURE_REQUEST, nullptr, 0);
+      this->write_command_(CMD_GET_TEMPERATURE_STATUS, nullptr, 0);
     }
   }
 
   void get_sensor_data_() {
     if (this->enthalpy_temperature != nullptr) {
       ESP_LOGD(TAG, "getting sensor data");
-      this->write_command_(COMFOAIR_GET_SENSOR_DATA_REQUEST, nullptr, 0);
+      this->write_command_(CMD_GET_SENSOR_DATA, nullptr, 0);
     }
   }
 
   void get_ventilation_level_() {
     ESP_LOGD(TAG, "getting ventilation level");
-    this->write_command_(COMFOAIR_GET_VENTILATION_LEVEL_REQUEST, nullptr, 0);
+    this->write_command_(CMD_GET_VENTILATION_LEVEL, nullptr, 0);
   }
 
   void get_temperatures_() {
     ESP_LOGD(TAG, "getting temperatures");
-    this->write_command_(COMFOAIR_GET_TEMPERATURES_REQUEST, nullptr, 0);
+    this->write_command_(CMD_GET_TEMPERATURES, nullptr, 0);
   }
 
   uint8_t get_uint8_t_(uint8_t start_index) const {
-    return this->data_[COMFOAIR_MSG_HEAD_LENGTH + start_index];
+    return this->data_[COMMAND_LEN_HEAD + start_index];
   }
 
   uint16_t get_uint16_(uint8_t start_index) const {
-    return (uint16_t(this->data_[COMFOAIR_MSG_HEAD_LENGTH + start_index + 1] | this->data_[COMFOAIR_MSG_HEAD_LENGTH + start_index] << 8));
+    return (uint16_t(this->data_[COMMAND_LEN_HEAD + start_index + 1] | this->data_[COMMAND_LEN_HEAD + start_index] << 8));
   }
 
   uint8_t data_[30];
