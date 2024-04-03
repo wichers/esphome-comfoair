@@ -186,7 +186,7 @@ public:
 
   float get_setup_priority() const override { return setup_priority::DATA; }
 
-  void reset_filter(void) {
+  void reset_and_self_test(void) {
     uint8_t reset_cmd[4] = {0, 0, 0, 1};
     this->write_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
 	}
