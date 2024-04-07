@@ -1,7 +1,7 @@
 # ComfoAir
-Port of ComfoAir protocol to ESPHome.io firmware, which is supported by external_components.
+Port of the ComfoAir protocol to ESPHome.io firmware, which is supported by external_components.
 
-Add the definition of `external_components` to your yaml configuration:
+Add the following definition of `external_components` to your yaml configuration:
 
 ```
 external_components:
@@ -10,7 +10,7 @@ external_components:
       url: https://github.com/wichers/esphome-comfoair
     components: [comfoair]
 ```
-and than use it:
+and then use it:
 ```
 uart:
   id: uart_bus
@@ -165,8 +165,7 @@ comfoair:
     name: "extractor_hood_switch_off_delay_minutes"
 ```
 
-The sensor defined here is a full list of sensor - if you remove the sensor from yaml it will not be monitored.
-
+The sensor defined here is a full list of sensors - if you remove a sensor from the yaml definition it will not be monitored.
 
 For visualization:
 Checkout https://github.com/wichers/lovelace-comfoair and follow the instructions.
