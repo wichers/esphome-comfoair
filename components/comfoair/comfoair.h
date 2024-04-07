@@ -53,8 +53,8 @@ public:
     if (call.get_fan_mode().has_value()) {
       int level;
 
-      this->fan_mode = *call.get_fan_mode();
-      switch (this->fan_mode.value()) {
+      fan_mode = *call.get_fan_mode();
+      switch (fan_mode.value()) {
         case climate::CLIMATE_FAN_HIGH:
           level = 0x04;
           break;
@@ -84,11 +84,11 @@ public:
 
     }
     if (call.get_target_temperature().has_value()) {
-      this->target_temperature = *call.get_target_temperature();
-      set_comfort_temperature_(this->target_temperature);
+      target_temperature = *call.get_target_temperature();
+      set_comfort_temperature_(target_temperature);
     }
 
-    this->publish_state();
+    publish_state();
   }
 
   void dump_config() override {
@@ -108,22 +108,22 @@ public:
     if (*(p + 13) != 0) {
       ESP_LOGCONFIG(TAG, "  CC-Luxe v%0d.%02d", *(p + 13) >> 4, *(p + 13) & 0x0f);
     }
-    this->check_uart_settings(9600);
+    check_uart_settings(9600);
   }
 
   void update() override {
     switch(update_counter_) {
       case -4:
-        this->write_command_(CMD_GET_BOOTLOADER_VERSION, nullptr, 0);
+        write_command_(CMD_GET_BOOTLOADER_VERSION, nullptr, 0);
         break;
       case -3:
-        this->write_command_(CMD_GET_FIRMWARE_VERSION, nullptr, 0);
+        write_command_(CMD_GET_FIRMWARE_VERSION, nullptr, 0);
         break;
       case -2:
-        this->write_command_(CMD_GET_CONNECTOR_BOARD_VERSION, nullptr, 0);
+        write_command_(CMD_GET_CONNECTOR_BOARD_VERSION, nullptr, 0);
         break;
       case -1:
-        this->write_command_(CMD_GET_STATUS, nullptr, 0);
+        write_command_(CMD_GET_STATUS, nullptr, 0);
         break;
       case 0:
         get_fan_status_();
@@ -163,36 +163,41 @@ public:
   }
 
   void loop() override {
-    while (this->available() != 0) {
-      this->read_byte(&this->data_[this->data_index_]);
-      auto check = this->check_byte_();
+    while (available() != 0) {
+      read_byte(&data_[data_index_]);
+      auto check = check_byte_();
       if (!check.has_value()) {
 
         // finished
-        if (this->data_[COMMAND_ID_ACK] != COMMAND_ACK) {
-          this->parse_data_();
+        if (data_[COMMAND_ID_ACK] != COMMAND_ACK) {
+          parse_data_();
         }
-        this->data_index_ = 0;
+        data_index_ = 0;
       } else if (!*check) {
         // wrong data
-        ESP_LOGV(TAG, "Byte %i of received data frame is invalid.", this->data_index_);
-        this->data_index_ = 0;
+        ESP_LOGV(TAG, "Byte %i of received data frame is invalid.", data_index_);
+        data_index_ = 0;
       } else {
         // next byte
-        this->data_index_++;
+        data_index_++;
       }
     }
   }
 
   float get_setup_priority() const override { return setup_priority::DATA; }
 
-  void reset_and_self_test(void) {
-    uint8_t reset_cmd[4] = {0, 0, 0, 1};
-    this->write_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
+  void error_reset(void) {
+    uint8_t reset_cmd[4] = {1, 0, 0, 0};
+    write_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
 	}
 
-  void set_name(const char* value) {this->name = value;}
-  void set_uart_component(uart::UARTComponent *parent) {this->set_uart_parent(parent);}
+  void filter_reset(void) {
+    uint8_t reset_cmd[4] = {0, 0, 0, 1};
+    write_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
+	}
+
+  void set_name(const char* value) {name = value;}
+  void set_uart_component(uart::UARTComponent *parent) {set_uart_parent(parent);}
 
 protected:
 
@@ -205,7 +210,7 @@ protected:
     ESP_LOGI(TAG, "Setting level to: %i", level);
     {
       uint8_t command[1] = {(uint8_t) level};
-      this->write_command_(CMD_SET_LEVEL, command, sizeof(command));
+      write_command_(CMD_SET_LEVEL, command, sizeof(command));
     }
   }
 
@@ -218,25 +223,25 @@ protected:
     ESP_LOGI(TAG, "Setting temperature to: %i", temperature);
     {
       uint8_t command[1] = {(uint8_t) ((temperature + 20.0f) * 2.0f)};
-      this->write_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
+      write_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
     }
   }
 
   void write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length) {
-    this->write_byte(COMMAND_PREFIX);
-    this->write_byte(COMMAND_HEAD);
-    this->write_byte(0x00);
-    this->write_byte(command);
-    this->write_byte(command_data_length);
+    write_byte(COMMAND_PREFIX);
+    write_byte(COMMAND_HEAD);
+    write_byte(0x00);
+    write_byte(command);
+    write_byte(command_data_length);
     if (command_data_length > 0) {
-      this->write_array(command_data, command_data_length);
-      this->write_byte((command + command_data_length + comfoair_checksum_(command_data, command_data_length)) & 0xff);
+      write_array(command_data, command_data_length);
+      write_byte((command + command_data_length + comfoair_checksum_(command_data, command_data_length)) & 0xff);
     } else {
-      this->write_byte(comfoair_checksum_(&command, 1));
+      write_byte(comfoair_checksum_(&command, 1));
     }
-    this->write_byte(COMMAND_PREFIX);
-    this->write_byte(COMMAND_TAIL);
-    this->flush();
+    write_byte(COMMAND_PREFIX);
+    write_byte(COMMAND_TAIL);
+    flush();
 }
 
   uint8_t comfoair_checksum_(const uint8_t *command_data, uint8_t length) const {
@@ -248,8 +253,8 @@ protected:
   }
 
   optional<bool> check_byte_() const {
-    uint8_t index = this->data_index_;
-    uint8_t byte = this->data_[index];
+    uint8_t index = data_index_;
+    uint8_t byte = data_[index];
 
     if (index == 0) {
       return byte == COMMAND_PREFIX;
@@ -271,9 +276,9 @@ protected:
       return true;
     }
 
-    uint8_t data_length = this->data_[COMMAND_IDX_DATA];
+    uint8_t data_length = data_[COMMAND_IDX_DATA];
 
-    if ((COMMAND_LEN_HEAD + data_length + COMMAND_LEN_TAIL) > sizeof(this->data_)) {
+    if ((COMMAND_LEN_HEAD + data_length + COMMAND_LEN_TAIL) > sizeof(data_)) {
       ESP_LOGW(TAG, "ComfoAir message too large");
       return false;
     }
@@ -284,9 +289,9 @@ protected:
 
     if (index == COMMAND_LEN_HEAD + data_length) {
       // checksum is without checksum bytes
-      uint8_t checksum = comfoair_checksum_(this->data_ + 2, COMMAND_LEN_HEAD + data_length - 2);
+      uint8_t checksum = comfoair_checksum_(data_ + 2, COMMAND_LEN_HEAD + data_length - 2);
       if (checksum != byte) {
-        //ESP_LOGW(TAG, "%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X", this->data_[0], this->data_[1], this->data_[2], this->data_[3], this->data_[4], this->data_[5], this->data_[6], this->data_[7], this->data_[8], this->data_[9], this->data_[10]);
+        //ESP_LOGW(TAG, "%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X", data_[0], data_[1], data_[2], data_[3], data_[4], data_[5], data_[6], data_[7], data_[8], data_[9], data_[10]);
         ESP_LOGW(TAG, "ComfoAir Checksum doesn't match: 0x%02X!=0x%02X", byte, checksum);
         return false;
       }
@@ -307,91 +312,91 @@ protected:
   }
 
   void parse_data_() {
-    this->status_clear_warning();
-    uint8_t *msg = &this->data_[COMMAND_LEN_HEAD];
+    status_clear_warning();
+    uint8_t *msg = &data_[COMMAND_LEN_HEAD];
 
-    switch (this->data_[COMMAND_IDX_MSG_ID]) {
+    switch (data_[COMMAND_IDX_MSG_ID]) {
       case RES_GET_BOOTLOADER_VERSION:
-        memcpy(bootloader_version_, msg, this->data_[COMMAND_IDX_DATA]);
+        memcpy(bootloader_version_, msg, data_[COMMAND_IDX_DATA]);
         break;
       case RES_GET_FIRMWARE_VERSION:
-        memcpy(firmware_version_, msg, this->data_[COMMAND_IDX_DATA]);
+        memcpy(firmware_version_, msg, data_[COMMAND_IDX_DATA]);
         break;
       case RES_GET_CONNECTOR_BOARD_VERSION:
-        memcpy(connector_board_version_, msg, this->data_[COMMAND_IDX_DATA]);
+        memcpy(connector_board_version_, msg, data_[COMMAND_IDX_DATA]);
         break;
       case RES_GET_FAN_STATUS: {
-          if (this->intake_fan_speed != nullptr) {
-            this->intake_fan_speed->publish_state(msg[0]);
+          if (intake_fan_speed != nullptr) {
+            intake_fan_speed->publish_state(msg[0]);
           }
-          if (this->exhaust_fan_speed != nullptr) {
-            this->exhaust_fan_speed->publish_state(msg[1]);
+          if (exhaust_fan_speed != nullptr) {
+            exhaust_fan_speed->publish_state(msg[1]);
           }
-          if (this->intake_fan_speed_rpm != nullptr) {
-            this->intake_fan_speed_rpm->publish_state(1875000.0f / this->get_uint16_(2));
+          if (intake_fan_speed_rpm != nullptr) {
+            intake_fan_speed_rpm->publish_state(1875000.0f / get_uint16_(2));
           }
-          if (this->exhaust_fan_speed_rpm != nullptr) {
-            this->exhaust_fan_speed_rpm->publish_state(1875000.0f / this->get_uint16_(4));
+          if (exhaust_fan_speed_rpm != nullptr) {
+            exhaust_fan_speed_rpm->publish_state(1875000.0f / get_uint16_(4));
           }
           break;
         }
       case RES_GET_VALVE_STATUS: {
-        if (this->bypass_valve != nullptr) {
-          this->bypass_valve->publish_state(msg[0]);
+        if (bypass_valve != nullptr) {
+          bypass_valve->publish_state(msg[0]);
         }
-        if (this->bypass_valve_open != nullptr) {
-          this->bypass_valve_open->publish_state(msg[0] != 0);
+        if (bypass_valve_open != nullptr) {
+          bypass_valve_open->publish_state(msg[0] != 0);
         }
-        if (this->preheating_state != nullptr) {
-          this->preheating_state->publish_state(msg[1] != 0);
+        if (preheating_state != nullptr) {
+          preheating_state->publish_state(msg[1] != 0);
         }
-        if (this->motor_current_bypass != nullptr) {
-          this->motor_current_bypass->publish_state(msg[2]);
+        if (motor_current_bypass != nullptr) {
+          motor_current_bypass->publish_state(msg[2]);
         }
-        if (this->motor_current_preheating != nullptr) {
-          this->motor_current_preheating->publish_state(msg[3]);
+        if (motor_current_preheating != nullptr) {
+          motor_current_preheating->publish_state(msg[3]);
         }
         break;
       }
       case RES_GET_BYPASS_CONTROL_STATUS: {
-        if (this->bypass_factor != nullptr) {
-          this->bypass_factor->publish_state(msg[2]);
+        if (bypass_factor != nullptr) {
+          bypass_factor->publish_state(msg[2]);
         }
-        if (this->bypass_step != nullptr) {
-          this->bypass_step->publish_state(msg[3]);
+        if (bypass_step != nullptr) {
+          bypass_step->publish_state(msg[3]);
         }
-        if (this->bypass_correction != nullptr) {
-          this->bypass_correction->publish_state(msg[4]);
+        if (bypass_correction != nullptr) {
+          bypass_correction->publish_state(msg[4]);
         }
-        if (this->summer_mode != nullptr) {
-          this->summer_mode->publish_state(msg[6] != 0);
+        if (summer_mode != nullptr) {
+          summer_mode->publish_state(msg[6] != 0);
         }
         break;
       }
       case RES_GET_TEMPERATURE_STATUS: {
 
         // T1 / outside air
-        if (this->outside_air_temperature != nullptr) {
-          this->outside_air_temperature->publish_state((float) msg[0] / 2.0f - 20.0f);
+        if (outside_air_temperature != nullptr) {
+          outside_air_temperature->publish_state((float) msg[0] / 2.0f - 20.0f);
         }
         // T2 / supply air
-        if (this->supply_air_temperature != nullptr) {
-          this->supply_air_temperature->publish_state((float) msg[1] / 2.0f - 20.0f);
+        if (supply_air_temperature != nullptr) {
+          supply_air_temperature->publish_state((float) msg[1] / 2.0f - 20.0f);
         }
         // T3 / return air
-        if (this->return_air_temperature != nullptr) {
-          this->return_air_temperature->publish_state((float) msg[2] / 2.0f - 20.0f);
+        if (return_air_temperature != nullptr) {
+          return_air_temperature->publish_state((float) msg[2] / 2.0f - 20.0f);
         }
         // T4 / exhaust air
-        if (this->exhaust_air_temperature != nullptr) {
-          this->exhaust_air_temperature->publish_state((float) msg[3] / 2.0f - 20.0f);
+        if (exhaust_air_temperature != nullptr) {
+          exhaust_air_temperature->publish_state((float) msg[3] / 2.0f - 20.0f);
         }
         break;
       }
       case RES_GET_SENSOR_DATA: {
 
-        if (this->enthalpy_temperature != nullptr) {
-          this->enthalpy_temperature->publish_state((float) msg[0] / 2.0f - 20.0f);
+        if (enthalpy_temperature != nullptr) {
+          enthalpy_temperature->publish_state((float) msg[0] / 2.0f - 20.0f);
         }
 
         break;
@@ -400,233 +405,233 @@ protected:
 
         ESP_LOGD(TAG, "Level %02x", msg[8]);
 
-        if (this->return_air_level != nullptr) {
-          this->return_air_level->publish_state(msg[6]);
+        if (return_air_level != nullptr) {
+          return_air_level->publish_state(msg[6]);
         }
-        if (this->supply_air_level != nullptr) {
-          this->supply_air_level->publish_state(msg[7]);
+        if (supply_air_level != nullptr) {
+          supply_air_level->publish_state(msg[7]);
         }
 
-        if (this->ventilation_level != nullptr) {
-          this->ventilation_level->publish_state(msg[8] - 1);
+        if (ventilation_level != nullptr) {
+          ventilation_level->publish_state(msg[8] - 1);
         }
 
         // Fan Speed
         switch(msg[8]) {
           case 0x00:
-            this->fan_mode = climate::CLIMATE_FAN_AUTO;
-            this->mode = climate::CLIMATE_MODE_AUTO;
+            fan_mode = climate::CLIMATE_FAN_AUTO;
+            mode = climate::CLIMATE_MODE_AUTO;
             break;
           case 0x01:
-            this->fan_mode = climate::CLIMATE_FAN_OFF;
-            this->mode = climate::CLIMATE_MODE_OFF;
+            fan_mode = climate::CLIMATE_FAN_OFF;
+            mode = climate::CLIMATE_MODE_OFF;
             break;
           case 0x02:
-            this->fan_mode = climate::CLIMATE_FAN_LOW;
-            this->mode = climate::CLIMATE_MODE_FAN_ONLY;
+            fan_mode = climate::CLIMATE_FAN_LOW;
+            mode = climate::CLIMATE_MODE_FAN_ONLY;
             break;
           case 0x03:
-            this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
-            this->mode = climate::CLIMATE_MODE_FAN_ONLY;
+            fan_mode = climate::CLIMATE_FAN_MEDIUM;
+            mode = climate::CLIMATE_MODE_FAN_ONLY;
           break;
           case 0x04:
-            this->fan_mode = climate::CLIMATE_FAN_HIGH;
-            this->mode = climate::CLIMATE_MODE_FAN_ONLY;
+            fan_mode = climate::CLIMATE_FAN_HIGH;
+            mode = climate::CLIMATE_MODE_FAN_ONLY;
             break;
         }
 
-        this->publish_state();
+        publish_state();
 
         // Supply air fan active (1 = active / 0 = inactive)
-        if (this->supply_fan_active != nullptr) {
-          this->supply_fan_active->publish_state(msg[9] == 1);
+        if (supply_fan_active != nullptr) {
+          supply_fan_active->publish_state(msg[9] == 1);
         }
         break;
       }
       case RES_GET_FAULTS: {
-        if (this->filter_status != nullptr) {
+        if (filter_status != nullptr) {
           uint8_t status = msg[8];
-          this->filter_status->publish_state(status == 0 ? "Ok" : (status == 1 ? "Full" : "Unknown"));
+          filter_status->publish_state(status == 0 ? "Ok" : (status == 1 ? "Full" : "Unknown"));
         }
         break;
       }
       case RES_GET_TEMPERATURES: {
 
         // comfort temperature
-        this->target_temperature = (float) msg[0] / 2.0f - 20.0f;
-        this->publish_state();
+        target_temperature = (float) msg[0] / 2.0f - 20.0f;
+        publish_state();
 
         // T1 / outside air
-        if (this->outside_air_temperature != nullptr && msg[5] & 0x01) {
-          this->outside_air_temperature->publish_state((float) msg[1] / 2.0f - 20.0f);
+        if (outside_air_temperature != nullptr && msg[5] & 0x01) {
+          outside_air_temperature->publish_state((float) msg[1] / 2.0f - 20.0f);
         }
         // T2 / supply air
-        if (this->supply_air_temperature != nullptr && msg[5] & 0x02) {
-          this->supply_air_temperature->publish_state((float) msg[2] / 2.0f - 20.0f);
+        if (supply_air_temperature != nullptr && msg[5] & 0x02) {
+          supply_air_temperature->publish_state((float) msg[2] / 2.0f - 20.0f);
         }
         // T3 / exhaust air
-        if (this->return_air_temperature != nullptr && msg[5] & 0x04) {
-          this->return_air_temperature->publish_state((float) msg[3] / 2.0f - 20.0f);
-          this->current_temperature = (float) msg[3] / 2.0f - 20.0f;
+        if (return_air_temperature != nullptr && msg[5] & 0x04) {
+          return_air_temperature->publish_state((float) msg[3] / 2.0f - 20.0f);
+          current_temperature = (float) msg[3] / 2.0f - 20.0f;
         }
         // T4 / continued air
-        if (this->exhaust_air_temperature != nullptr && msg[5] & 0x08) {
-          this->exhaust_air_temperature->publish_state((float) msg[4] / 2.0f - 20.0f);
+        if (exhaust_air_temperature != nullptr && msg[5] & 0x08) {
+          exhaust_air_temperature->publish_state((float) msg[4] / 2.0f - 20.0f);
         }
         // EWT
-        if (this->ewt_temperature != nullptr && msg[5] & 0x10) {
-          this->ewt_temperature->publish_state((float) msg[6] / 2.0f - 20.0f);
+        if (ewt_temperature != nullptr && msg[5] & 0x10) {
+          ewt_temperature->publish_state((float) msg[6] / 2.0f - 20.0f);
         }
         // reheating
-        if (this->reheating_temperature != nullptr && msg[5] & 0x20) {
-          this->reheating_temperature->publish_state((float) msg[7] / 2.0f - 20.0f);
+        if (reheating_temperature != nullptr && msg[5] & 0x20) {
+          reheating_temperature->publish_state((float) msg[7] / 2.0f - 20.0f);
         }
         // kitchen hood
-        if (this->kitchen_hood_temperature != nullptr && msg[5] & 0x40) {
-          this->kitchen_hood_temperature->publish_state((float) msg[8] / 2.0f - 20.0f);
+        if (kitchen_hood_temperature != nullptr && msg[5] & 0x40) {
+          kitchen_hood_temperature->publish_state((float) msg[8] / 2.0f - 20.0f);
         }
 
         break;
       }
       case RES_GET_STATUS: {
-        if (this->preheating_present != nullptr) {
-          this->preheating_present->publish_state(msg[0]);
+        if (preheating_present != nullptr) {
+          preheating_present->publish_state(msg[0]);
         }
 
-        if (this->bypass_present != nullptr) {
-          this->bypass_present->publish_state(msg[1]);
+        if (bypass_present != nullptr) {
+          bypass_present->publish_state(msg[1]);
         }
 
-        if (this->type != nullptr) {
-          this->type->publish_state(msg[2] == 1 ? "Left" : (msg[2] == 2 ? "Right" : "Unknown"));
+        if (type != nullptr) {
+          type->publish_state(msg[2] == 1 ? "Left" : (msg[2] == 2 ? "Right" : "Unknown"));
         }
 
-        if (this->size != nullptr) {
-          this->size->publish_state(msg[3] == 1 ? "Large" : (msg[3] == 2 ? "Small" : "Unknown"));
+        if (size != nullptr) {
+          size->publish_state(msg[3] == 1 ? "Large" : (msg[3] == 2 ? "Small" : "Unknown"));
         }
 
-        if (this->options_present != nullptr) {
-          this->options_present->publish_state(msg[4]);
+        if (options_present != nullptr) {
+          options_present->publish_state(msg[4]);
         }
 
-        if (this->p10_active != nullptr) {
-          this->p10_active->publish_state(msg[6] & 0x01);
+        if (p10_active != nullptr) {
+          p10_active->publish_state(msg[6] & 0x01);
         }
 
-        if (this->p11_active != nullptr) {
-          this->p11_active->publish_state(msg[6] & 0x02);
+        if (p11_active != nullptr) {
+          p11_active->publish_state(msg[6] & 0x02);
         }
 
-        if (this->p12_active != nullptr) {
-          this->p12_active->publish_state(msg[6] & 0x04);
+        if (p12_active != nullptr) {
+          p12_active->publish_state(msg[6] & 0x04);
         }
 
-        if (this->p13_active != nullptr) {
-          this->p13_active->publish_state(msg[6] & 0x08);
+        if (p13_active != nullptr) {
+          p13_active->publish_state(msg[6] & 0x08);
         }
 
-        if (this->p14_active != nullptr) {
-          this->p14_active->publish_state(msg[6] & 0x10);
+        if (p14_active != nullptr) {
+          p14_active->publish_state(msg[6] & 0x10);
         }
 
-        if (this->p15_active != nullptr) {
-          this->p15_active->publish_state(msg[6] & 0x20);
+        if (p15_active != nullptr) {
+          p15_active->publish_state(msg[6] & 0x20);
         }
 
-        if (this->p16_active != nullptr) {
-          this->p16_active->publish_state(msg[6] & 0x40);
+        if (p16_active != nullptr) {
+          p16_active->publish_state(msg[6] & 0x40);
         }
 
-        if (this->p17_active != nullptr) {
-          this->p17_active->publish_state(msg[6] & 0x80);
+        if (p17_active != nullptr) {
+          p17_active->publish_state(msg[6] & 0x80);
         }
 
-        if (this->p18_active != nullptr) {
-          this->p18_active->publish_state(msg[7] & 0x01);
+        if (p18_active != nullptr) {
+          p18_active->publish_state(msg[7] & 0x01);
         }
 
-        if (this->p19_active != nullptr) {
-          this->p19_active->publish_state(msg[7] & 0x02);
+        if (p19_active != nullptr) {
+          p19_active->publish_state(msg[7] & 0x02);
         }
 
-        if (this->p90_active != nullptr) {
-          this->p90_active->publish_state(msg[8] & 0x01);
+        if (p90_active != nullptr) {
+          p90_active->publish_state(msg[8] & 0x01);
         }
 
-        if (this->p91_active != nullptr) {
-          this->p91_active->publish_state(msg[8] & 0x02);
+        if (p91_active != nullptr) {
+          p91_active->publish_state(msg[8] & 0x02);
         }
 
-        if (this->p92_active != nullptr) {
-          this->p92_active->publish_state(msg[8] & 0x04);
+        if (p92_active != nullptr) {
+          p92_active->publish_state(msg[8] & 0x04);
         }
 
-        if (this->p93_active != nullptr) {
-          this->p93_active->publish_state(msg[8] & 0x08);
+        if (p93_active != nullptr) {
+          p93_active->publish_state(msg[8] & 0x08);
         }
 
-        if (this->p94_active != nullptr) {
-          this->p94_active->publish_state(msg[8] & 0x10);
+        if (p94_active != nullptr) {
+          p94_active->publish_state(msg[8] & 0x10);
         }
 
-        if (this->p95_active != nullptr) {
-          this->p95_active->publish_state(msg[8] & 0x20);
+        if (p95_active != nullptr) {
+          p95_active->publish_state(msg[8] & 0x20);
         }
 
-        if (this->p96_active != nullptr) {
-          this->p96_active->publish_state(msg[8] & 0x40);
+        if (p96_active != nullptr) {
+          p96_active->publish_state(msg[8] & 0x40);
         }
 
-        if (this->p97_active != nullptr) {
-          this->p97_active->publish_state(msg[8] & 0x80);
+        if (p97_active != nullptr) {
+          p97_active->publish_state(msg[8] & 0x80);
         }
 
-        if (this->enthalpy_present != nullptr) {
-          this->enthalpy_present->publish_state(msg[9]);
+        if (enthalpy_present != nullptr) {
+          enthalpy_present->publish_state(msg[9]);
         }
 
-        if (this->ewt_present != nullptr) {
-          this->ewt_present->publish_state(msg[10]);
+        if (ewt_present != nullptr) {
+          ewt_present->publish_state(msg[10]);
         }
         break;
       }
       case RES_GET_OPERATION_HOURS: {
-        if (this->level0_hours != nullptr) {
-          this->level0_hours->publish_state(msg[0] + msg[1] + msg[2]);
+        if (level0_hours != nullptr) {
+          level0_hours->publish_state(msg[0] + msg[1] + msg[2]);
         }
 
-        if (this->level1_hours != nullptr) {
-          this->level1_hours->publish_state(msg[3] + msg[4] + msg[5]);
+        if (level1_hours != nullptr) {
+          level1_hours->publish_state(msg[3] + msg[4] + msg[5]);
         }
 
-        if (this->level2_hours != nullptr) {
-          this->level2_hours->publish_state(msg[6] + msg[7] + msg[8]);
+        if (level2_hours != nullptr) {
+          level2_hours->publish_state(msg[6] + msg[7] + msg[8]);
         }
 
-        if (this->level3_hours != nullptr) {
-          this->level3_hours->publish_state(msg[17] + msg[18] + msg[19]);
+        if (level3_hours != nullptr) {
+          level3_hours->publish_state(msg[17] + msg[18] + msg[19]);
         }
 
-        if (this->frost_protection_hours != nullptr) {
-          this->frost_protection_hours->publish_state(msg[9] + msg[10]);
+        if (frost_protection_hours != nullptr) {
+          frost_protection_hours->publish_state(msg[9] + msg[10]);
         }
 
-        if (this->bypass_open_hours != nullptr) {
-          this->bypass_open_hours->publish_state(msg[13] + msg[14]);
+        if (bypass_open_hours != nullptr) {
+          bypass_open_hours->publish_state(msg[13] + msg[14]);
         }
 
-        if (this->preheating_hours != nullptr) {
-          this->preheating_hours->publish_state(msg[11] + msg[12]);
+        if (preheating_hours != nullptr) {
+          preheating_hours->publish_state(msg[11] + msg[12]);
         }
 
-        if (this->filter_hours != nullptr) {
-          this->filter_hours->publish_state(msg[15] + msg[16]);
+        if (filter_hours != nullptr) {
+          filter_hours->publish_state(msg[15] + msg[16]);
         }
         break;
       }
 
       case RES_GET_PREHEATING_STATUS: {
-        if (this->preheating_valve != nullptr) {
+        if (preheating_valve != nullptr) {
           std::string name_preheating_valve;
           switch (msg[0]) {
             case 0:
@@ -641,22 +646,22 @@ protected:
               name_preheating_valve = "Unknown";
               break;
           }
-          this->preheating_valve->publish_state(name_preheating_valve);
+          preheating_valve->publish_state(name_preheating_valve);
         }
 
-        if (this->frost_protection_active != nullptr) {
-          this->frost_protection_active->publish_state(msg[1] != 0);
+        if (frost_protection_active != nullptr) {
+          frost_protection_active->publish_state(msg[1] != 0);
         }
 
-        if (this->preheating_state != nullptr) {
-          this->preheating_state->publish_state(msg[2] != 0);
+        if (preheating_state != nullptr) {
+          preheating_state->publish_state(msg[2] != 0);
         }
 
-        if (this->frost_protection_minutes != nullptr) {
-          this->frost_protection_minutes->publish_state(msg[3] + msg[4]);
+        if (frost_protection_minutes != nullptr) {
+          frost_protection_minutes->publish_state(msg[3] + msg[4]);
         }
 
-        if (this->frost_protection_level != nullptr) {
+        if (frost_protection_level != nullptr) {
           std::string name_frost_protection_level;
           switch (msg[5]) {
             case 0:
@@ -679,41 +684,41 @@ protected:
               name_frost_protection_level = "Unknown";
               break;
           }
-          this->frost_protection_level->publish_state(name_frost_protection_level);
+          frost_protection_level->publish_state(name_frost_protection_level);
         }
         break;
       }
       case RES_GET_TIME_DELAY: {
-        if (this->bathroom_switch_on_delay_minutes != nullptr) {
-          this->bathroom_switch_on_delay_minutes->publish_state(msg[0]);
+        if (bathroom_switch_on_delay_minutes != nullptr) {
+          bathroom_switch_on_delay_minutes->publish_state(msg[0]);
         }
 
-        if (this->bathroom_switch_off_delay_minutes != nullptr) {
-          this->bathroom_switch_off_delay_minutes->publish_state(msg[1]);
+        if (bathroom_switch_off_delay_minutes != nullptr) {
+          bathroom_switch_off_delay_minutes->publish_state(msg[1]);
         }
 
-        if (this->l1_switch_off_delay_minutes != nullptr) {
-          this->l1_switch_off_delay_minutes->publish_state(msg[2]);
+        if (l1_switch_off_delay_minutes != nullptr) {
+          l1_switch_off_delay_minutes->publish_state(msg[2]);
         }
 
-        if (this->boost_ventilation_minutes != nullptr) {
-          this->boost_ventilation_minutes->publish_state(msg[3]);
+        if (boost_ventilation_minutes != nullptr) {
+          boost_ventilation_minutes->publish_state(msg[3]);
         }
 
-        if (this->filter_warning_weeks != nullptr) {
-          this->filter_warning_weeks->publish_state(msg[4]);
+        if (filter_warning_weeks != nullptr) {
+          filter_warning_weeks->publish_state(msg[4]);
         }
 
-        if (this->rf_high_time_short_minutes != nullptr) {
-          this->rf_high_time_short_minutes->publish_state(msg[5]);
+        if (rf_high_time_short_minutes != nullptr) {
+          rf_high_time_short_minutes->publish_state(msg[5]);
         }
 
-        if (this->rf_high_time_long_minutes != nullptr) {
-          this->rf_high_time_long_minutes->publish_state(msg[6]);
+        if (rf_high_time_long_minutes != nullptr) {
+          rf_high_time_long_minutes->publish_state(msg[6]);
         }
 
-        if (this->extractor_hood_switch_off_delay_minutes != nullptr) {
-          this->extractor_hood_switch_off_delay_minutes->publish_state(msg[7]);
+        if (extractor_hood_switch_off_delay_minutes != nullptr) {
+          extractor_hood_switch_off_delay_minutes->publish_state(msg[7]);
         }
 
         break;
@@ -722,89 +727,89 @@ protected:
   }
 
   void get_fan_status_() {
-    if (this->intake_fan_speed != nullptr ||
-        this->exhaust_fan_speed != nullptr ||
-        this->intake_fan_speed_rpm != nullptr ||
-        this->exhaust_fan_speed_rpm != nullptr) {
+    if (intake_fan_speed != nullptr ||
+        exhaust_fan_speed != nullptr ||
+        intake_fan_speed_rpm != nullptr ||
+        exhaust_fan_speed_rpm != nullptr) {
       ESP_LOGD(TAG, "getting fan status");
-      this->write_command_(CMD_GET_FAN_STATUS, nullptr, 0);
+      write_command_(CMD_GET_FAN_STATUS, nullptr, 0);
     }
   }
 
   void get_valve_status_() {
-    if (this->bypass_valve != nullptr ||
-      this->bypass_valve_open != nullptr ||
-      this->preheating_state != nullptr) {
+    if (bypass_valve != nullptr ||
+      bypass_valve_open != nullptr ||
+      preheating_state != nullptr) {
       ESP_LOGD(TAG, "getting valve status");
-      this->write_command_(CMD_GET_VALVE_STATUS, nullptr, 0);
+      write_command_(CMD_GET_VALVE_STATUS, nullptr, 0);
     }
   }
 
   void get_error_status_() {
-    if (this->filter_status != nullptr) {
+    if (filter_status != nullptr) {
       ESP_LOGD(TAG, "getting error status");
-      this->write_command_(CMD_GET_FAULTS, nullptr, 0);
+      write_command_(CMD_GET_FAULTS, nullptr, 0);
     }
   }
 
   void get_bypass_control_status_() {
-    if (this->bypass_factor != nullptr ||
-      this->bypass_step != nullptr ||
-      this->bypass_correction != nullptr ||
-      this->summer_mode != nullptr) {
+    if (bypass_factor != nullptr ||
+      bypass_step != nullptr ||
+      bypass_correction != nullptr ||
+      summer_mode != nullptr) {
       ESP_LOGD(TAG, "getting bypass control");
-      this->write_command_(CMD_GET_BYPASS_CONTROL_STATUS, nullptr, 0);
+      write_command_(CMD_GET_BYPASS_CONTROL_STATUS, nullptr, 0);
     }
   }
 
   void get_temperature_() {
-    if (this->outside_air_temperature != nullptr ||
-      this->supply_air_temperature != nullptr ||
-      this->return_air_temperature != nullptr ||
-      this->outside_air_temperature != nullptr) {
+    if (outside_air_temperature != nullptr ||
+      supply_air_temperature != nullptr ||
+      return_air_temperature != nullptr ||
+      outside_air_temperature != nullptr) {
       ESP_LOGD(TAG, "getting temperature");
-      this->write_command_(CMD_GET_TEMPERATURE_STATUS, nullptr, 0);
+      write_command_(CMD_GET_TEMPERATURE_STATUS, nullptr, 0);
     }
   }
 
   void get_sensor_data_() {
-    if (this->enthalpy_temperature != nullptr) {
+    if (enthalpy_temperature != nullptr) {
       ESP_LOGD(TAG, "getting sensor data");
-      this->write_command_(CMD_GET_SENSOR_DATA, nullptr, 0);
+      write_command_(CMD_GET_SENSOR_DATA, nullptr, 0);
     }
   }
 
   void get_ventilation_level_() {
     ESP_LOGD(TAG, "getting ventilation level");
-    this->write_command_(CMD_GET_VENTILATION_LEVEL, nullptr, 0);
+    write_command_(CMD_GET_VENTILATION_LEVEL, nullptr, 0);
   }
 
   void get_temperatures_() {
     ESP_LOGD(TAG, "getting temperatures");
-    this->write_command_(CMD_GET_TEMPERATURES, nullptr, 0);
+    write_command_(CMD_GET_TEMPERATURES, nullptr, 0);
   }
 
   void get_operation_hours_() {
     ESP_LOGD(TAG, "getting operation hours");
-    this->write_command_(CMD_GET_OPERATION_HOURS, nullptr, 0);
+    write_command_(CMD_GET_OPERATION_HOURS, nullptr, 0);
   }
 
   void get_preheating_status_() {
     ESP_LOGD(TAG, "getting preheating status");
-    this->write_command_(CMD_GET_PREHEATING_STATUS, nullptr, 0);
+    write_command_(CMD_GET_PREHEATING_STATUS, nullptr, 0);
   }
 
   void get_time_delay_() {
     ESP_LOGD(TAG, "getting time delay");
-    this->write_command_(CMD_GET_TIME_DELAY, nullptr, 0);
+    write_command_(CMD_GET_TIME_DELAY, nullptr, 0);
   }
 
   uint8_t get_uint8_t_(uint8_t start_index) const {
-    return this->data_[COMMAND_LEN_HEAD + start_index];
+    return data_[COMMAND_LEN_HEAD + start_index];
   }
 
   uint16_t get_uint16_(uint8_t start_index) const {
-    return (uint16_t(this->data_[COMMAND_LEN_HEAD + start_index + 1] | this->data_[COMMAND_LEN_HEAD + start_index] << 8));
+    return (uint16_t(data_[COMMAND_LEN_HEAD + start_index + 1] | data_[COMMAND_LEN_HEAD + start_index] << 8));
   }
 
   uint8_t data_[30];
