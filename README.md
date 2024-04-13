@@ -169,3 +169,8 @@ The sensor defined here is a full list of sensors - if you remove a sensor from 
 
 For visualization:
 Checkout https://github.com/wichers/lovelace-comfoair and follow the instructions.
+
+## Support my work
+Thank you for thinking about supporting my work.
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/wichers)
