@@ -1,0 +1,250 @@
+substitutions:
+  node_name: comfoair
+  device_name: ComfoAir
+  entity_prefix: ''
+
+esp32:
+  board: esp32dev
+
+esphome:
+  name: ${node_name}
+  comment: ${device_name}
+  friendly_name: "${device_name}"
+  # # Local building
+  # includes:
+  #   - components/comfoair/comfoair.h
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/wichers/esphome-comfoair
+    components: [comfoair]
+
+wifi:
+  power_save_mode: none
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ${node_name}-setup
+    password: ${node_name}setup
+
+captive_portal:
+
+# Disable uart logging
+logger:
+  baud_rate: 0
+
+# Enable Home Assistant API
+api:
+
+ota:
+  platform: esphome
+
+web_server:
+
+output:
+  - platform: gpio
+    id: orange_led_out
+    pin: GPIO18
+  - platform: gpio
+    id: green_led_out
+    pin: GPIO19
+
+interval:
+  - interval: 1s
+    then:
+      if:
+        condition:
+          wifi.connected:
+        then:
+          - output.turn_off: green_led_out
+        else:
+          - output.turn_on: green_led_out
+          - delay: 500ms
+          - output.turn_off: green_led_out
+  - interval: 500ms
+    then:
+      if:
+        condition:
+          api.connected:
+        then:
+          - output.turn_off: orange_led_out
+        else:
+          - if:
+              condition:
+                wifi.connected
+              then:
+                - output.turn_on: orange_led_out
+                - delay: 250ms
+                - output.turn_off: orange_led_out
+              else:
+                - output.turn_off: orange_led_out
+
+sensor:
+  - platform: uptime
+    name: "${entity_prefix} Uptime"
+  - platform: wifi_signal
+    name: "WiFi Signal Strength"
+    update_interval: 60s
+
+binary_sensor:
+
+switch:
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+    hide_timestamp: true
+
+uart:
+  id: uart_bus
+  baud_rate: 9600
+  tx_pin: 17
+  rx_pin: 16
+
+comfoair:
+  name: "${device_name}"
+  uart_id: uart_bus
+  type:
+    name: "Type"
+  size:
+    name: "Size"
+  intake_fan_speed:
+    name: "Supply air level"
+  exhaust_fan_speed:
+    name: "Return air level"
+  intake_fan_speed_rpm:
+    name: "Intake fan RPM"
+  exhaust_fan_speed_rpm:
+    name: "Exhaust fan RPM"
+  ventilation_level:
+    name: "Ventilation level"
+  bypass_present:
+    name: "Bypass present"
+  bypass_valve:
+    name: "Bypass valve"
+  bypass_valve_open:
+    name: "Bypass open"
+  preheating_state:
+    name: "Preheating state"
+  outside_air_temperature:
+    name: "Outside temperature"
+  supply_air_temperature:
+    name: "Supply temperature"
+  return_air_temperature:
+    name: "Return temperature"
+  exhaust_air_temperature:
+    name: "Exhaust temperature"
+  enthalpy_temperature:
+    name: "Enthalpy temperature"
+  ewt_temperature:
+    name: "EWT temperature "
+  reheating_temperature:
+    name: "Reheating temperature"
+  kitchen_hood_temperature:
+    name: "Kitchen hood temperature"
+  return_air_level:
+    name: "Return level"
+  supply_air_level:
+    name: "Supply level"
+  supply_fan_active:
+    name: "Supply fan active"
+  filter_status:
+    name: "Filter status"
+  enthalpy_present:
+    name: "Enthalpy present"
+  ewt_present:
+    name: "EWT present"
+  options_present:
+    name: "Options present"
+  preheating_present:
+    name: "Preheating present"
+  bypass_factor:
+    name: "Bypass factor"
+  bypass_step:
+    name: "Bypass step"
+  bypass_correction:
+    name: "Bypass correction"
+  bypass_open_hours:
+    name: "Bypass open hours"
+  preheating_hours:
+    name: "Preheating hours"
+  level0_hours:
+    name: "Level 0 hours"
+  level1_hours:
+    name: "Level 1 hours"
+  level2_hours:
+    name: "Level 2 hours"
+  level3_hours:
+    name: "Level 3 hours"
+  preheating_valve:
+    name: "Preheating valve"
+  frost_protection_active:
+    name: "Frost protection active"
+  frost_protection_hours:
+    name: "Frost protection hours"
+  frost_protection_minutes:
+    name: "Frost protection minutes"
+  frost_protection_level:
+    name: "Frost protection level"
+  filter_hours:
+    name: "Filter hours"
+  motor_current_bypass:
+    name: "Motor current bypass"
+  motor_current_preheating:
+    name: "Motor current preheating"
+  summer_mode:
+    name: "Summer mode"
+  p10_active:
+    name: "P10 active"
+  p11_active:
+    name: "P11 active"
+  p12_active:
+    name: "P12 active"
+  p13_active:
+    name: "P13 active"
+  p14_active:
+    name: "P14 active"
+  p15_active:
+    name: "P15 active"
+  p16_active:
+    name: "P16 active"
+  p17_active:
+    name: "P17 active"
+  p18_active:
+    name: "P18 active"
+  p19_active:
+    name: "P19 active"
+  p90_active:
+    name: "P90 active"
+  p91_active:
+    name: "P91 active"
+  p92_active:
+    name: "P92 active"
+  p93_active:
+    name: "P93 active"
+  p94_active:
+    name: "P94 active"
+  p95_active:
+    name: "P95 active"
+  p96_active:
+    name: "P96 active"
+  p97_active:
+    name: "P97 active"
+  bathroom_switch_on_delay_minutes:
+    name: "Bathroom switch on delay minutes"
+  bathroom_switch_off_delay_minutes:
+    name: "Bathroom switch off delay minutes"
+  l1_switch_off_delay_minutes:
+    name: "L1 switch off delay minutes"
+  boost_ventilation_minutes:
+    name: "Boost ventilation minutes"
+  filter_warning_weeks:
+    name: "Filter warning weeks"
+  rf_high_time_short_minutes:
+    name: "RF high time short minutes"
+  rf_high_time_long_minutes:
+    name: "RF high time long minutes"
+  extractor_hood_switch_off_delay_minutes:
+    name: "Extractor hood switch off delay minutes"
