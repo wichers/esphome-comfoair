@@ -24,6 +24,7 @@ api:
   password: 'set-an-api-password-here'
 
 ota:
+  platform: esphome
 
 sensor:
 binary_sensor:

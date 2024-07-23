@@ -597,35 +597,35 @@ protected:
       }
       case RES_GET_OPERATION_HOURS: {
         if (level0_hours != nullptr) {
-          level0_hours->publish_state(msg[0] + msg[1] + msg[2]);
+          level0_hours->publish_state((msg[0] << 16) | (msg[1] << 8) | msg[2]);
         }
 
         if (level1_hours != nullptr) {
-          level1_hours->publish_state(msg[3] + msg[4] + msg[5]);
+          level1_hours->publish_state((msg[3] << 16) | (msg[4] << 8) | msg[5]);
         }
 
         if (level2_hours != nullptr) {
-          level2_hours->publish_state(msg[6] + msg[7] + msg[8]);
+          level2_hours->publish_state((msg[6] << 16) | (msg[7] << 8) | msg[8]);
         }
 
         if (level3_hours != nullptr) {
-          level3_hours->publish_state(msg[17] + msg[18] + msg[19]);
+          level3_hours->publish_state((msg[17] << 16) | (msg[18] << 8) | msg[19]);
         }
 
         if (frost_protection_hours != nullptr) {
-          frost_protection_hours->publish_state(msg[9] + msg[10]);
+          frost_protection_hours->publish_state((msg[9] << 8) | msg[10]);
         }
 
         if (bypass_open_hours != nullptr) {
-          bypass_open_hours->publish_state(msg[13] + msg[14]);
+          bypass_open_hours->publish_state((msg[13] << 8) | msg[14]);
         }
 
         if (preheating_hours != nullptr) {
-          preheating_hours->publish_state(msg[11] + msg[12]);
+          preheating_hours->publish_state((msg[11] << 8) | msg[12]);
         }
 
         if (filter_hours != nullptr) {
-          filter_hours->publish_state(msg[15] + msg[16]);
+          filter_hours->publish_state((msg[15] << 8) | msg[16]);
         }
         break;
       }
@@ -658,7 +658,7 @@ protected:
         }
 
         if (frost_protection_minutes != nullptr) {
-          frost_protection_minutes->publish_state(msg[3] + msg[4]);
+          frost_protection_minutes->publish_state((msg[3] << 8) | msg[4]);
         }
 
         if (frost_protection_level != nullptr) {
