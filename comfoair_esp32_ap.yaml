@@ -158,6 +158,14 @@ comfoair:
     name: "EWT present"
   options_present:
     name: "Options present"
+  fireplace_present:
+    name: "fireplace_present"
+  kitchen_hood_present:
+    name: "kitchen_hood_present"
+  postheating_present:
+    name: "postheating_present"
+  postheating_pwm_mode_present:
+    name: "postheating_pwm_mode_present"
   preheating_present:
     name: "Preheating present"
   bypass_factor:

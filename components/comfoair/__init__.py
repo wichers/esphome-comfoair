@@ -44,6 +44,10 @@ CONF_BYPASS_PRESENT = "bypass_present"
 CONF_ENTHALPY_PRESENT = "enthalpy_present"
 CONF_EWT_PRESENT = "ewt_present"
 CONF_OPTIONS_PRESENT = "options_present"
+CONF_FIREPLACE_PRESENT = "fireplace_present"
+CONF_KITCHEN_HOOD_PRESENT = "kitchen_hood_present"
+CONF_POSTHEATING_PRESENT = "postheating_present"
+CONF_POSTHEATING_PWM_MODE_PRESENT = "postheating_pwm_mode_present"
 CONF_PREHEATING_PRESENT = "preheating_present"
 CONF_BYPASS_VALVE = "bypass_valve"
 CONF_BYPASS_VALVE_OPEN = "bypass_valve_open"
@@ -140,6 +144,10 @@ helper_comfoair = {
         CONF_ENTHALPY_PRESENT,
         CONF_EWT_PRESENT,
         CONF_OPTIONS_PRESENT,
+        CONF_FIREPLACE_PRESENT,
+        CONF_KITCHEN_HOOD_PRESENT,
+        CONF_POSTHEATING_PRESENT,
+        CONF_POSTHEATING_PWM_MODE_PRESENT,
         CONF_PREHEATING_PRESENT,
         CONF_BYPASS_VALVE_OPEN,
         CONF_PREHEATING_STATE,
@@ -417,6 +425,18 @@ comfoair_sensors_schemas = cv.Schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
         cv.Optional(CONF_OPTIONS_PRESENT): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_FIREPLACE_PRESENT): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_KITCHEN_HOOD_PRESENT): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_POSTHEATING_PRESENT): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_POSTHEATING_PWM_MODE_PRESENT): binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
         cv.Optional(CONF_PREHEATING_PRESENT): binary_sensor.binary_sensor_schema(

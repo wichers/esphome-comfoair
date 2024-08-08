@@ -514,6 +514,22 @@ protected:
           options_present->publish_state(msg[4]);
         }
 
+        if (fireplace_present != nullptr) {
+          fireplace_present->publish_state(msg[4] & 0x01);
+        }
+
+        if (kitchen_hood_present != nullptr) {
+          kitchen_hood_present->publish_state(msg[4] & 0x02);
+        }
+
+        if (postheating_present != nullptr) {
+          postheating_present->publish_state(msg[4] & 0x04);
+        }
+
+        if (postheating_pwm_mode_present != nullptr) {
+          postheating_pwm_mode_present->publish_state(msg[4] & 0x40);
+        }
+
         if (p10_active != nullptr) {
           p10_active->publish_state(msg[6] & 0x01);
         }
@@ -864,6 +880,10 @@ public:
   binary_sensor::BinarySensor *ewt_present{nullptr};
   binary_sensor::BinarySensor *preheating_present{nullptr};
   binary_sensor::BinarySensor *options_present{nullptr};
+  binary_sensor::BinarySensor *fireplace_present{nullptr};
+  binary_sensor::BinarySensor *kitchen_hood_present{nullptr};
+  binary_sensor::BinarySensor *postheating_present{nullptr};
+  binary_sensor::BinarySensor *postheating_pwm_mode_present{nullptr};
   binary_sensor::BinarySensor *bypass_valve_open{nullptr};
   binary_sensor::BinarySensor *preheating_state{nullptr};
   binary_sensor::BinarySensor *summer_mode{nullptr};
@@ -908,6 +928,10 @@ public:
   void set_ewt_present(binary_sensor::BinarySensor *ewt_present) { this->ewt_present = ewt_present; };
   void set_preheating_present(binary_sensor::BinarySensor *preheating_present) { this->preheating_present = preheating_present; };
   void set_options_present(binary_sensor::BinarySensor *options_present) { this->options_present = options_present; };
+  void set_fireplace_present(binary_sensor::BinarySensor *fireplace_present) { this->fireplace_present = fireplace_present; };
+  void set_kitchen_hood_present(binary_sensor::BinarySensor *kitchen_hood_present) { this->kitchen_hood_present = kitchen_hood_present; };
+  void set_postheating_present(binary_sensor::BinarySensor *postheating_present) { this->postheating_present = postheating_present; };
+  void set_postheating_pwm_mode_present(binary_sensor::BinarySensor *postheating_pwm_mode_present) { this->postheating_pwm_mode_present = postheating_pwm_mode_present; };
   void set_bypass_valve_open(binary_sensor::BinarySensor *bypass_valve_open) { this->bypass_valve_open = bypass_valve_open; };
   void set_preheating_state(binary_sensor::BinarySensor *preheating_state) { this->preheating_state = preheating_state; };
   void set_outside_air_temperature(sensor::Sensor *outside_air_temperature) { this->outside_air_temperature = outside_air_temperature; };
