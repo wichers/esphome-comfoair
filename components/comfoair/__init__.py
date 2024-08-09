@@ -1,14 +1,14 @@
 """ Creates module ComfoAir """
 
-import esphome.config_validation as cv
 import esphome.codegen as cg
-from esphome.const import *
-from esphome.components import uart
-from esphome.components import climate
-from esphome.components import sensor
-from esphome.components import binary_sensor
-from esphome.components import text_sensor
-from esphome import pins
+import esphome.config_validation as cv
+from esphome.components import binary_sensor, sensor, text_sensor, uart
+from esphome.const import (CONF_ID, CONF_UART_ID, DEVICE_CLASS_CURRENT,
+                           DEVICE_CLASS_EMPTY, DEVICE_CLASS_SPEED,
+                           DEVICE_CLASS_TEMPERATURE, DEVICE_CLASS_VOLUME,
+                           STATE_CLASS_MEASUREMENT, UNIT_AMPERE, UNIT_CELSIUS,
+                           UNIT_CUBIC_METER, UNIT_HOUR, UNIT_MINUTE,
+                           UNIT_PERCENT, UNIT_REVOLUTIONS_PER_MINUTE)
 
 comfoair_ns = cg.esphome_ns.namespace("comfoair")
 ComfoAirComponent = comfoair_ns.class_("ComfoAirComponent", cg.Component)
@@ -513,8 +513,8 @@ def to_code(config):
     cg.add(var.set_name(config[REQUIRED_KEY_NAME]))
     paren = yield cg.get_variable(config[CONF_UART_ID])
     cg.add(var.set_uart_component(paren))
-    for k in helper_comfoair:
-        for v in helper_comfoair[k]:
+    for k, values in helper_comfoair.items():
+        for v in values:
             if not v in config:
                 continue
             sens = None
