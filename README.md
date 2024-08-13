@@ -170,6 +170,14 @@ The sensor defined here is a full list of sensors - if you remove a sensor from 
 For visualization:
 Checkout https://github.com/wichers/lovelace-comfoair and follow the instructions.
 
+## Compatibility
+
+This is a list of models that are known to work, feel free to add yours if you tested it successfully:
+
+* Zehnder ComfoAir 160
+* Zehnder ComfoAir 200
+* Zehnder Comfoair 550
+
 ## Support my work
 Thank you for thinking about supporting my work.
 
