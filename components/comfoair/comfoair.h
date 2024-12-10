@@ -245,11 +245,18 @@ protected:
 }
 
   uint8_t comfoair_checksum_(const uint8_t *command_data, uint8_t length) const {
-    uint8_t sum = 0;
+    uint8_t sum = 173;
+    bool skip = false;
     for (uint8_t i = 0; i < length; i++) {
+      if (command_data[i] == 0x07) {
+        if (skip)
+          continue;
+        else
+          skip = true;
+      }
       sum += command_data[i];
     }
-    return sum + 0xad;
+    return sum % 256;
   }
 
   optional<bool> check_byte_() const {
