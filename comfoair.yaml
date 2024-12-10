@@ -1,6 +1,5 @@
 esphome:
   name: comfoair
-  id: "comfoair_climate"
   platform: ESP8266
   board: esp01_1m
   includes:
@@ -38,6 +37,7 @@ uart:
 
 comfoair:
   name: "ComfoAir 350"
+  id: "comfoair_climate"
   uart_id: uart_bus
   type:
     name: "type"
@@ -189,7 +189,7 @@ comfoair:
     name: "rf_high_time_long_minutes"
   extractor_hood_switch_off_delay_minutes:
     name: "extractor_hood_switch_off_delay_minutes"
-    
+
 button:
   - platform: template
     name: "Reset Filter"
