@@ -521,6 +521,22 @@ protected:
           options_present->publish_state(msg[4]);
         }
 
+        if (fireplace_present != nullptr) {
+          fireplace_present->publish_state(msg[4] & 0x01);
+        }
+
+        if (kitchen_hood_present != nullptr) {
+          kitchen_hood_present->publish_state(msg[4] & 0x02);
+        }
+
+        if (postheating_present != nullptr) {
+          postheating_present->publish_state(msg[4] & 0x04);
+        }
+
+        if (postheating_pwm_mode_present != nullptr) {
+          postheating_pwm_mode_present->publish_state(msg[4] & 0x40);
+        }
+
         if (p10_active != nullptr) {
           p10_active->publish_state(msg[6] & 0x01);
         }
@@ -604,35 +620,35 @@ protected:
       }
       case RES_GET_OPERATION_HOURS: {
         if (level0_hours != nullptr) {
-          level0_hours->publish_state(msg[0] + msg[1] + msg[2]);
+          level0_hours->publish_state((msg[0] << 16) | (msg[1] << 8) | msg[2]);
         }
 
         if (level1_hours != nullptr) {
-          level1_hours->publish_state(msg[3] + msg[4] + msg[5]);
+          level1_hours->publish_state((msg[3] << 16) | (msg[4] << 8) | msg[5]);
         }
 
         if (level2_hours != nullptr) {
-          level2_hours->publish_state(msg[6] + msg[7] + msg[8]);
+          level2_hours->publish_state((msg[6] << 16) | (msg[7] << 8) | msg[8]);
         }
 
         if (level3_hours != nullptr) {
-          level3_hours->publish_state(msg[17] + msg[18] + msg[19]);
+          level3_hours->publish_state((msg[17] << 16) | (msg[18] << 8) | msg[19]);
         }
 
         if (frost_protection_hours != nullptr) {
-          frost_protection_hours->publish_state(msg[9] + msg[10]);
+          frost_protection_hours->publish_state((msg[9] << 8) | msg[10]);
         }
 
         if (bypass_open_hours != nullptr) {
-          bypass_open_hours->publish_state(msg[13] + msg[14]);
+          bypass_open_hours->publish_state((msg[13] << 8) | msg[14]);
         }
 
         if (preheating_hours != nullptr) {
-          preheating_hours->publish_state(msg[11] + msg[12]);
+          preheating_hours->publish_state((msg[11] << 8) | msg[12]);
         }
 
         if (filter_hours != nullptr) {
-          filter_hours->publish_state(msg[15] + msg[16]);
+          filter_hours->publish_state((msg[15] << 8) | msg[16]);
         }
         break;
       }
@@ -665,7 +681,7 @@ protected:
         }
 
         if (frost_protection_minutes != nullptr) {
-          frost_protection_minutes->publish_state(msg[3] + msg[4]);
+          frost_protection_minutes->publish_state((msg[3] << 8) | msg[4]);
         }
 
         if (frost_protection_level != nullptr) {
@@ -871,6 +887,10 @@ public:
   binary_sensor::BinarySensor *ewt_present{nullptr};
   binary_sensor::BinarySensor *preheating_present{nullptr};
   binary_sensor::BinarySensor *options_present{nullptr};
+  binary_sensor::BinarySensor *fireplace_present{nullptr};
+  binary_sensor::BinarySensor *kitchen_hood_present{nullptr};
+  binary_sensor::BinarySensor *postheating_present{nullptr};
+  binary_sensor::BinarySensor *postheating_pwm_mode_present{nullptr};
   binary_sensor::BinarySensor *bypass_valve_open{nullptr};
   binary_sensor::BinarySensor *preheating_state{nullptr};
   binary_sensor::BinarySensor *summer_mode{nullptr};
@@ -915,6 +935,10 @@ public:
   void set_ewt_present(binary_sensor::BinarySensor *ewt_present) { this->ewt_present = ewt_present; };
   void set_preheating_present(binary_sensor::BinarySensor *preheating_present) { this->preheating_present = preheating_present; };
   void set_options_present(binary_sensor::BinarySensor *options_present) { this->options_present = options_present; };
+  void set_fireplace_present(binary_sensor::BinarySensor *fireplace_present) { this->fireplace_present = fireplace_present; };
+  void set_kitchen_hood_present(binary_sensor::BinarySensor *kitchen_hood_present) { this->kitchen_hood_present = kitchen_hood_present; };
+  void set_postheating_present(binary_sensor::BinarySensor *postheating_present) { this->postheating_present = postheating_present; };
+  void set_postheating_pwm_mode_present(binary_sensor::BinarySensor *postheating_pwm_mode_present) { this->postheating_pwm_mode_present = postheating_pwm_mode_present; };
   void set_bypass_valve_open(binary_sensor::BinarySensor *bypass_valve_open) { this->bypass_valve_open = bypass_valve_open; };
   void set_preheating_state(binary_sensor::BinarySensor *preheating_state) { this->preheating_state = preheating_state; };
   void set_outside_air_temperature(sensor::Sensor *outside_air_temperature) { this->outside_air_temperature = outside_air_temperature; };
