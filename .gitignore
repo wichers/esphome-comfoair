@@ -5,3 +5,6 @@
 /.vs/slnx.sqlite
 /.vs
 /root@
+
+# ESPHome
+.esphome/
