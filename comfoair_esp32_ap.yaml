@@ -15,9 +15,11 @@ esphome:
   #   - components/comfoair/comfoair.h
 
 external_components:
-  - source:
-      type: git
-      url: https://github.com/wichers/esphome-comfoair
+  # - source:
+  #     type: git
+  #     url: https://github.com/wichers/esphome-comfoair
+  #   components: [comfoair]
+  - source: components
     components: [comfoair]
 
 wifi:
@@ -105,6 +107,7 @@ uart:
   rx_pin: 16
 
 comfoair:
+  id: comfoair_climate
   name: "${device_name}"
   uart_id: uart_bus
   type:
@@ -257,3 +260,79 @@ comfoair:
     name: "RF high time long minutes"
   extractor_hood_switch_off_delay_minutes:
     name: "Extractor hood switch off delay minutes"
+
+number:
+  - platform: template
+    name: "Set Supply Low Level"
+    id: supply_low_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    set_action:
+      - lambda: |-
+          id(comfoair_climate).set_supply_low_level(static_cast<uint8_t>(x));
+    lambda: |-
+      return id(comfoair_climate).get_supply_low_level();
+    update_interval: 5s
+  - platform: template
+    name: "Set Exhaust Low Level"
+    id: exhaust_low_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    set_action:
+      - lambda: |-
+          id(comfoair_climate).set_exhaust_low_level(static_cast<uint8_t>(x));
+    lambda: |-
+      return id(comfoair_climate).get_exhaust_low_level();
+    update_interval: 5s
+
+  - platform: template
+    name: "Set Supply Medium Level"
+    id: supply_medium_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    set_action:
+      - lambda: |-
+          id(comfoair_climate).set_supply_medium_level(static_cast<uint8_t>(x));
+    lambda: |-
+      return id(comfoair_climate).get_supply_medium_level();
+    update_interval: 5s
+  - platform: template
+    name: "Set Exhaust Medium Level"
+    id: exhaust_medium_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    set_action:
+      - lambda: |-
+          id(comfoair_climate).set_exhaust_medium_level(static_cast<uint8_t>(x));
+    lambda: |-
+      return id(comfoair_climate).get_exhaust_medium_level();
+    update_interval: 5s
+
+  - platform: template
+    name: "Set Supply High Level"
+    id: supply_high_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    set_action:
+      - lambda: |-
+          id(comfoair_climate).set_supply_high_level(static_cast<uint8_t>(x));
+    lambda: |-
+      return id(comfoair_climate).get_supply_high_level();
+    update_interval: 5s
+  - platform: template
+    name: "Set Exhaust High Level"
+    id: exhaust_high_level
+    min_value: 0
+    max_value: 100
+    step: 1
+    set_action:
+      - lambda: |-
+          id(comfoair_climate).set_exhaust_high_level(static_cast<uint8_t>(x));
+    lambda: |-
+      return id(comfoair_climate).get_exhaust_high_level();
+    update_interval: 5s

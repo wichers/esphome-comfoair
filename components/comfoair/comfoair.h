@@ -227,6 +227,35 @@ protected:
     }
   }
 
+  void send_ventilation_levels_() {
+    uint8_t command_data[9] = {
+      exhaust_absent_,
+      exhaust_low_,
+      exhaust_medium_,
+      supply_absent_,
+      supply_low_,
+      supply_medium_,
+      exhaust_high_,
+      supply_high_,
+      unused_byte_
+    };
+    // Debug write to check if the values are correct
+    ESP_LOGD(TAG, "-----------------------------------");
+    ESP_LOGD(TAG, "SET VENTILATION LEVEL %:");
+    ESP_LOGD(TAG, "- Supply Absent: %02x\t(%d%%)", supply_absent_, supply_absent_);
+    ESP_LOGD(TAG, "- Exhaust Absent: %02x\t(%d%%)", exhaust_absent_, exhaust_absent_);
+    ESP_LOGD(TAG, "- Supply Low: %02x\t(%d%%)", supply_low_, supply_low_);
+    ESP_LOGD(TAG, "- Exhaust Low: %02x\t(%d%%)", exhaust_low_, exhaust_low_);
+    ESP_LOGD(TAG, "- Supply Medium: %02x\t(%d%%)", supply_medium_, supply_medium_);
+    ESP_LOGD(TAG, "- Exhaust Medium: %02x\t(%d%%)", exhaust_medium_, exhaust_medium_);
+    ESP_LOGD(TAG, "- Supply High: %02x\t(%d%%)", supply_high_, supply_high_);
+    ESP_LOGD(TAG, "- Exhaust High: %02x\t(%d%%)", exhaust_high_, exhaust_high_);
+    // ESP_LOGD(TAG, "- Unused Byte: %02x", unused_byte_);
+    ESP_LOGD(TAG, "-----------------------------------");
+    
+    write_command_(CMD_SET_VENTILATION_LEVEL, command_data, sizeof(command_data));
+  }
+
   void write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length) {
     write_byte(COMMAND_PREFIX);
     write_byte(COMMAND_HEAD);
@@ -411,6 +440,37 @@ protected:
       case RES_GET_VENTILATION_LEVEL: {
 
         ESP_LOGD(TAG, "Level %02x", msg[8]);
+
+        exhaust_absent_ = msg[0];
+        exhaust_low_ = msg[1];
+        exhaust_medium_ = msg[2];
+        supply_absent_ = msg[3];
+        supply_low_ = msg[4];
+        supply_medium_ = msg[5];
+        exhaust_high_ = msg[10];
+        supply_high_ = msg[11];
+        
+        if (exhaust_absent_level != nullptr) exhaust_absent_level->publish_state(exhaust_absent_);
+        if (exhaust_low_level != nullptr) exhaust_low_level->publish_state(exhaust_low_);
+        if (exhaust_medium_level != nullptr) exhaust_medium_level->publish_state(exhaust_medium_);
+        if (exhaust_high_level != nullptr) exhaust_high_level->publish_state(exhaust_high_);
+        if (supply_absent_level != nullptr) supply_absent_level->publish_state(supply_absent_);
+        if (supply_low_level != nullptr) supply_low_level->publish_state(supply_low_);
+        if (supply_medium_level != nullptr) supply_medium_level->publish_state(supply_medium_);
+        if (supply_high_level != nullptr) supply_high_level->publish_state(supply_high_);
+
+        ESP_LOGD(TAG, "-----------------------------------");
+        ESP_LOGD(TAG, "READ VENTILATION LEVEL %:");
+        ESP_LOGD(TAG, "- Supply Absent: %02x\t(%d%%)", supply_absent_, supply_absent_);
+        ESP_LOGD(TAG, "- Exhaust Absent: %02x\t(%d%%)", exhaust_absent_, exhaust_absent_);
+        ESP_LOGD(TAG, "- Supply Low: %02x\t(%d%%)", supply_low_, supply_low_);
+        ESP_LOGD(TAG, "- Exhaust Low: %02x\t(%d%%)", exhaust_low_, exhaust_low_);
+        ESP_LOGD(TAG, "- Supply Medium: %02x\t(%d%%)", supply_medium_, supply_medium_);
+        ESP_LOGD(TAG, "- Exhaust Medium: %02x\t(%d%%)", exhaust_medium_, exhaust_medium_);
+        ESP_LOGD(TAG, "- Supply High: %02x\t(%d%%)", supply_high_, supply_high_);
+        ESP_LOGD(TAG, "- Exhaust High: %02x\t(%d%%)", exhaust_high_, exhaust_high_);
+        // ESP_LOGD(TAG, "- Unused Byte: %02x", unused_byte_);
+        ESP_LOGD(TAG, "-----------------------------------");
 
         if (return_air_level != nullptr) {
           return_air_level->publish_state(msg[6]);
@@ -845,6 +905,16 @@ protected:
   uint8_t connector_board_version_[14]{0};
   const char* name{0};
 
+  uint8_t supply_absent_{0};
+  uint8_t exhaust_absent_{0};
+  uint8_t supply_low_{0};
+  uint8_t exhaust_low_{0};
+  uint8_t supply_medium_{0};
+  uint8_t exhaust_medium_{0};
+  uint8_t supply_high_{0};
+  uint8_t exhaust_high_{0};
+  uint8_t unused_byte_{0};
+
 public:
   text_sensor::TextSensor *type{nullptr};
   text_sensor::TextSensor *size{nullptr};
@@ -921,6 +991,14 @@ public:
   sensor::Sensor *rf_high_time_short_minutes{nullptr};
   sensor::Sensor *rf_high_time_long_minutes{nullptr};
   sensor::Sensor *extractor_hood_switch_off_delay_minutes{nullptr};
+  sensor::Sensor *supply_absent_level{nullptr};
+  sensor::Sensor *exhaust_absent_level{nullptr};
+  sensor::Sensor *supply_low_level{nullptr};
+  sensor::Sensor *exhaust_low_level{nullptr};
+  sensor::Sensor *supply_medium_level{nullptr};
+  sensor::Sensor *exhaust_medium_level{nullptr};
+  sensor::Sensor *supply_high_level{nullptr};
+  sensor::Sensor *exhaust_high_level{nullptr};
 
   void set_type(text_sensor::TextSensor *type) { this->type = type; };
   void set_size(text_sensor::TextSensor *size) { this->size = size; };
@@ -997,6 +1075,55 @@ public:
   void set_rf_high_time_short_minutes(sensor::Sensor *rf_high_time_short_minutes) { this->rf_high_time_short_minutes = rf_high_time_short_minutes; };
   void set_rf_high_time_long_minutes(sensor::Sensor *rf_high_time_long_minutes) { this->rf_high_time_long_minutes = rf_high_time_long_minutes; };
   void set_extractor_hood_switch_off_delay_minutes(sensor::Sensor *extractor_hood_switch_off_delay_minutes) { this->extractor_hood_switch_off_delay_minutes = extractor_hood_switch_off_delay_minutes; };
+
+  void set_exhaust_absent_level(uint8_t value) { 
+    exhaust_absent_ = value;
+    send_ventilation_levels_();
+  }
+
+  void set_exhaust_low_level(uint8_t value) { 
+    exhaust_low_ = value;
+    send_ventilation_levels_();
+  }
+
+  void set_exhaust_medium_level(uint8_t value) { 
+    exhaust_medium_ = value;
+    send_ventilation_levels_();
+  }
+
+  void set_exhaust_high_level(uint8_t value) { 
+    exhaust_high_ = value;
+    send_ventilation_levels_();
+  }
+
+  void set_supply_absent_level(uint8_t value) { 
+    supply_absent_ = value;
+    send_ventilation_levels_();
+  }
+
+  void set_supply_low_level(uint8_t value) { 
+    supply_low_ = value;
+    send_ventilation_levels_();
+  }
+
+  void set_supply_medium_level(uint8_t value) { 
+    supply_medium_ = value;
+    send_ventilation_levels_();
+  }
+
+  void set_supply_high_level(uint8_t value) { 
+    supply_high_ = value;
+    send_ventilation_levels_();
+  }
+
+  uint8_t get_supply_absent_level() const { return supply_absent_; }
+  uint8_t get_exhaust_absent_level() const { return exhaust_absent_; }
+  uint8_t get_supply_low_level() const { return supply_low_; }
+  uint8_t get_exhaust_low_level() const { return exhaust_low_; }
+  uint8_t get_supply_medium_level() const { return supply_medium_; }
+  uint8_t get_exhaust_medium_level() const { return exhaust_medium_; }
+  uint8_t get_supply_high_level() const { return supply_high_; }
+  uint8_t get_exhaust_high_level() const { return exhaust_high_; }
 };
 
 }  // namespace comfoair
