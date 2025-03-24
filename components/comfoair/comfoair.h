@@ -252,7 +252,7 @@ protected:
     ESP_LOGD(TAG, "- Exhaust High: %02x\t(%d%%)", exhaust_high_, exhaust_high_);
     // ESP_LOGD(TAG, "- Unused Byte: %02x", unused_byte_);
     ESP_LOGD(TAG, "-----------------------------------");
-    
+
     write_command_(CMD_SET_VENTILATION_LEVEL, command_data, sizeof(command_data));
   }
 
