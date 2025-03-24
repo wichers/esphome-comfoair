@@ -5,9 +5,29 @@ substitutions:
   developer: Svenar
   entity_prefix: ''
 
+globals:
+  - id: supply_shutoff_active
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+  - id: stored_sup_abs
+    type: int
+    restore_value: yes
+  - id: stored_sup_low
+    type: int
+    restore_value: yes
+  - id: stored_sup_med
+    type: int
+    restore_value: yes
+  - id: stored_sup_hig
+    type: int
+    restore_value: yes
+
 esp32:
   board: esp32dev
-
+  framework:
+    type: arduino
+  
 esphome:
   name: ${node_name}
   comment: ${device_name}
@@ -15,9 +35,6 @@ esphome:
   project:
     name: "${developer}.${description}"
     version: 1.1.0
-  # # Local building
-  # includes:
-  #   - components/comfoair/comfoair.h
 
 external_components:
   # - source:
@@ -33,6 +50,9 @@ wifi:
   ap:
     ssid: ${node_name}-setup
     password: ${node_name}setup
+
+preferences:
+  id: ca_preferences
 
 captive_portal:
 
@@ -95,10 +115,6 @@ sensor:
     update_interval: 60s
 
 binary_sensor:
-
-switch:
-  - platform: factory_reset
-    name: Restart with Factory Default Settings
 
 text_sensor:
   - platform: version
@@ -265,6 +281,48 @@ comfoair:
     name: "RF high time long minutes"
   extractor_hood_switch_off_delay_minutes:
     name: "Extractor hood switch off delay minutes"
+
+switch:
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+  - platform: template
+    name: "Supply Shutoff"
+    id: supply_shutoff
+    icon: "mdi:fan-off"
+    lambda: |-
+      if (id(supply_shutoff_active)) {
+        return true;
+      }
+      // Check if all levels are zero
+      return (id(comfoair_climate).get_supply_absent_level() == 0) &&
+             (id(comfoair_climate).get_supply_low_level() == 0) &&
+             (id(comfoair_climate).get_supply_medium_level() == 0) &&
+             (id(comfoair_climate).get_supply_high_level() == 0);
+    turn_on_action:
+      - lambda: |-
+          // Only store if not already active
+          if (!id(supply_shutoff_active)) {
+            id(stored_sup_abs) = id(comfoair_climate).get_supply_absent_level();
+            id(stored_sup_low) = id(comfoair_climate).get_supply_low_level();
+            id(stored_sup_med) = id(comfoair_climate).get_supply_medium_level();
+            id(stored_sup_hig) = id(comfoair_climate).get_supply_high_level();
+          }
+          
+          id(comfoair_climate).set_supply_absent_level(0);
+          id(comfoair_climate).set_supply_low_level(0);
+          id(comfoair_climate).set_supply_medium_level(0);
+          id(comfoair_climate).set_supply_high_level(0);
+          id(supply_shutoff_active) = true;
+
+    turn_off_action:
+      - lambda: |-
+          if (id(supply_shutoff_active)) {
+            id(comfoair_climate).set_supply_absent_level(id(stored_sup_abs));
+            id(comfoair_climate).set_supply_low_level(id(stored_sup_low));
+            id(comfoair_climate).set_supply_medium_level(id(stored_sup_med));
+            id(comfoair_climate).set_supply_high_level(id(stored_sup_hig));
+            id(supply_shutoff_active) = false;
+          }
 
 number:
   - platform: template
