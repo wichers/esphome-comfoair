@@ -6,5 +6,8 @@
 /.vs
 /root@
 
+pycache/
+__pycache__/
+
 # ESPHome
 .esphome/
