@@ -1076,6 +1076,14 @@ public:
   void set_rf_high_time_long_minutes(sensor::Sensor *rf_high_time_long_minutes) { this->rf_high_time_long_minutes = rf_high_time_long_minutes; };
   void set_extractor_hood_switch_off_delay_minutes(sensor::Sensor *extractor_hood_switch_off_delay_minutes) { this->extractor_hood_switch_off_delay_minutes = extractor_hood_switch_off_delay_minutes; };
 
+  void set_exhaust_levels(uint8_t value_abs, uint8_t value_low, uint8_t value_medium, uint8_t value_high) { 
+    exhaust_absent_ = value_abs;
+    exhaust_low_ = value_low;
+    exhaust_medium_ = value_medium;
+    exhaust_high_ = value_high;
+    send_ventilation_levels_();
+  }
+
   void set_exhaust_absent_level(uint8_t value) { 
     exhaust_absent_ = value;
     send_ventilation_levels_();
@@ -1093,6 +1101,14 @@ public:
 
   void set_exhaust_high_level(uint8_t value) { 
     exhaust_high_ = value;
+    send_ventilation_levels_();
+  }
+
+  void set_supply_levels(uint8_t value_abs, uint8_t value_low, uint8_t value_medium, uint8_t value_high) { 
+    supply_absent_ = value_abs;
+    supply_low_ = value_low;
+    supply_medium_ = value_medium;
+    supply_high_ = value_high;
     send_ventilation_levels_();
   }
 

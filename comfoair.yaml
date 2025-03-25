@@ -308,19 +308,13 @@ switch:
             id(stored_sup_hig) = id(comfoair_climate).get_supply_high_level();
           }
           
-          id(comfoair_climate).set_supply_absent_level(0);
-          id(comfoair_climate).set_supply_low_level(0);
-          id(comfoair_climate).set_supply_medium_level(0);
-          id(comfoair_climate).set_supply_high_level(0);
+          id(comfoair_climate).set_supply_levels(0, 0, 0, 0);
           id(supply_shutoff_active) = true;
 
     turn_off_action:
       - lambda: |-
           if (id(supply_shutoff_active)) {
-            id(comfoair_climate).set_supply_absent_level(id(stored_sup_abs));
-            id(comfoair_climate).set_supply_low_level(id(stored_sup_low));
-            id(comfoair_climate).set_supply_medium_level(id(stored_sup_med));
-            id(comfoair_climate).set_supply_high_level(id(stored_sup_hig));
+            id(comfoair_climate).set_supply_levels(id(stored_sup_abs), id(stored_sup_low), id(stored_sup_med), id(stored_sup_hig));
             id(supply_shutoff_active) = false;
           }
 
