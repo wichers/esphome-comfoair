@@ -253,7 +253,11 @@ protected:
     // ESP_LOGD(TAG, "- Unused Byte: %02x", unused_byte_);
     ESP_LOGD(TAG, "-----------------------------------");
 
-    write_command_(CMD_SET_VENTILATION_LEVEL, command_data, sizeof(command_data));
+    if (can_send_ventilation_levels_) {
+      write_command_(CMD_SET_VENTILATION_LEVEL, command_data, sizeof(command_data));
+    } else {
+      ESP_LOGW(TAG, "Can't send ventilation levels yet");
+    }
   }
 
   void write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length) {
@@ -458,6 +462,8 @@ protected:
         if (supply_low_level != nullptr) supply_low_level->publish_state(supply_low_);
         if (supply_medium_level != nullptr) supply_medium_level->publish_state(supply_medium_);
         if (supply_high_level != nullptr) supply_high_level->publish_state(supply_high_);
+
+        can_send_ventilation_levels_ = true;
 
         ESP_LOGD(TAG, "-----------------------------------");
         ESP_LOGD(TAG, "READ VENTILATION LEVEL %:");
@@ -914,6 +920,7 @@ protected:
   uint8_t supply_high_{0};
   uint8_t exhaust_high_{0};
   uint8_t unused_byte_{0};
+  bool can_send_ventilation_levels_{false};
 
 public:
   text_sensor::TextSensor *type{nullptr};

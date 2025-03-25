@@ -6,10 +6,6 @@ substitutions:
   entity_prefix: ''
 
 globals:
-  - id: supply_shutoff_active
-    type: bool
-    restore_value: yes
-    initial_value: 'false'
   - id: stored_sup_abs
     type: int
     restore_value: yes
@@ -34,7 +30,7 @@ esphome:
   friendly_name: "${device_name}"
   project:
     name: "${developer}.${description}"
-    version: 1.1.0
+    version: 1.1.1
 
 external_components:
   # - source:
@@ -289,34 +285,32 @@ switch:
     name: "Supply Shutoff"
     id: supply_shutoff
     icon: "mdi:fan-off"
+    restore_mode: RESTORE_DEFAULT_OFF
     lambda: |-
-      if (id(supply_shutoff_active)) {
-        return true;
-      }
       // Check if all levels are zero
       return (id(comfoair_climate).get_supply_absent_level() == 0) &&
              (id(comfoair_climate).get_supply_low_level() == 0) &&
              (id(comfoair_climate).get_supply_medium_level() == 0) &&
              (id(comfoair_climate).get_supply_high_level() == 0);
+    
     turn_on_action:
       - lambda: |-
-          // Only store if not already active
-          if (!id(supply_shutoff_active)) {
-            id(stored_sup_abs) = id(comfoair_climate).get_supply_absent_level();
-            id(stored_sup_low) = id(comfoair_climate).get_supply_low_level();
-            id(stored_sup_med) = id(comfoair_climate).get_supply_medium_level();
-            id(stored_sup_hig) = id(comfoair_climate).get_supply_high_level();
-          }
+          ESP_LOGD("custom", "Supply Shutoff turn_on_action");
+          id(stored_sup_abs) = id(comfoair_climate).get_supply_absent_level();
+          id(stored_sup_low) = id(comfoair_climate).get_supply_low_level();
+          id(stored_sup_med) = id(comfoair_climate).get_supply_medium_level();
+          id(stored_sup_hig) = id(comfoair_climate).get_supply_high_level();
           
           id(comfoair_climate).set_supply_levels(0, 0, 0, 0);
-          id(supply_shutoff_active) = true;
 
     turn_off_action:
       - lambda: |-
-          if (id(supply_shutoff_active)) {
-            id(comfoair_climate).set_supply_levels(id(stored_sup_abs), id(stored_sup_low), id(stored_sup_med), id(stored_sup_hig));
-            id(supply_shutoff_active) = false;
-          }
+          ESP_LOGD("custom", "Supply Shutoff turn_off_action");
+          if (id(stored_sup_abs) == 0) id(stored_sup_abs) = 15;
+          if (id(stored_sup_low) == 0) id(stored_sup_low) = 35;
+          if (id(stored_sup_med) == 0) id(stored_sup_med) = 50;
+          if (id(stored_sup_hig) == 0) id(stored_sup_hig) = 70;
+          id(comfoair_climate).set_supply_levels(id(stored_sup_abs), id(stored_sup_low), id(stored_sup_med), id(stored_sup_hig));
 
 number:
   - platform: template
