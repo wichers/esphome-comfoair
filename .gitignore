@@ -1,13 +1,41 @@
-﻿################################################################################
-# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
-################################################################################
-
-/.vs/slnx.sqlite
-/.vs
-/root@
-
-pycache/
+﻿# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.bak
+*.swp
+*.swo
+.env/
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
 
 # ESPHome
 .esphome/
+*.yaml.lck
+*.bin
+*.hex
+*.elf
+*.map
+*.dmp
+*.dat
+*.tar.gz
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swm
+
+# OS-specific
+.DS_Store
+Thumbs.db
