@@ -47,9 +47,6 @@ wifi:
     ssid: ${node_name}-setup
     password: ${node_name}setup
 
-preferences:
-  id: ca_preferences
-
 captive_portal:
 
 # Disable uart logging
