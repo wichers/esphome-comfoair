@@ -33,12 +33,12 @@ esphome:
     version: 1.1.1
 
 external_components:
-  # - source:
-  #     type: git
-  #     url: https://github.com/wichers/esphome-comfoair
-  #   components: [comfoair]
-  - source: components
+  - source:
+      type: git
+      url: https://github.com/svenar-iot/esphome-comfoair
     components: [comfoair]
+  # - source: components
+  #   components: [comfoair]
 
 wifi:
   power_save_mode: none
