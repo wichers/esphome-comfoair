@@ -22,7 +22,7 @@ globals:
 esp32:
   board: esp32dev
   framework:
-    type: arduino
+    type: esp-idf
   
 esphome:
   name: ${node_name}
@@ -30,15 +30,19 @@ esphome:
   friendly_name: "${device_name}"
   project:
     name: "${developer}.${description}"
-    version: 1.1.1
+    version: 1.1.2
 
 external_components:
-  - source:
-      type: git
-      url: https://github.com/svenar-iot/esphome-comfoair
-    components: [comfoair]
-  # - source: components
+  # - source:
+  #     type: git
+  #     url: https://github.com/svenar-iot/esphome-comfoair
   #   components: [comfoair]
+  - source: components
+    components: [comfoair]
+
+dashboard_import:
+  package_import_url: github://svenar-iot/esphome-comfoair/comfoair.yaml@v1.1.1
+  import_full_config: false # or true
 
 wifi:
   power_save_mode: none
@@ -124,6 +128,12 @@ comfoair:
   id: comfoair_climate
   name: "${device_name}"
   uart_id: uart_bus
+  bootloader_info:
+    name: "Bootloader"
+  firmware_info:
+    name: "Firmware"
+  connector_board_info:
+    name: "Connector board"
   type:
     name: "Type"
   size:

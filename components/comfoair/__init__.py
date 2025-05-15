@@ -20,6 +20,9 @@ CONF_HUB_ID = "comfoair"
 
 UNIT_WEEK = "weeks"
 
+CONF_BOOTLOADER_INFO = "bootloader_info"
+CONF_FIRMWARE_INFO = "firmware_info"
+CONF_CONNECTOR_BOARD_INFO = "connector_board_info"
 CONF_TYPE = "type"
 CONF_SIZE = "size"
 CONF_INTAKE_FAN_SPEED = "intake_fan_speed"
@@ -175,6 +178,9 @@ helper_comfoair = {
         CONF_P97_ACTIVE,
     ],
     "text_sensor": [
+        CONF_BOOTLOADER_INFO,
+        CONF_FIRMWARE_INFO,
+        CONF_CONNECTOR_BOARD_INFO,
         CONF_TYPE,
         CONF_SIZE,
         CONF_FILTER_STATUS,
@@ -185,6 +191,9 @@ helper_comfoair = {
 
 comfoair_sensors_schemas = cv.Schema(
     {
+        cv.Optional(CONF_BOOTLOADER_INFO): text_sensor.text_sensor_schema(),
+        cv.Optional(CONF_FIRMWARE_INFO): text_sensor.text_sensor_schema(),
+        cv.Optional(CONF_CONNECTOR_BOARD_INFO): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_TYPE): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_SIZE): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_FILTER_STATUS): text_sensor.text_sensor_schema(),

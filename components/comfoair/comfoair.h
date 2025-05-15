@@ -354,17 +354,27 @@ protected:
   void parse_data_() {
     status_clear_warning();
     uint8_t *msg = &data_[COMMAND_LEN_HEAD];
+    char buf[64];
 
     switch (data_[COMMAND_IDX_MSG_ID]) {
       case RES_GET_BOOTLOADER_VERSION:
         memcpy(bootloader_version_, msg, data_[COMMAND_IDX_DATA]);
+        snprintf(buf, sizeof(buf), "%.10s v%0d.%02d b%2d", bootloader_version_ + 3, *bootloader_version_, *(bootloader_version_ + 1), *(bootloader_version_ + 2));
+        bootloader_info->publish_state(buf);
         break;
+
       case RES_GET_FIRMWARE_VERSION:
         memcpy(firmware_version_, msg, data_[COMMAND_IDX_DATA]);
+        snprintf(buf, sizeof(buf), "%.10s v%0d.%02d b%2d", firmware_version_ + 3, *firmware_version_, *(firmware_version_ + 1), *(firmware_version_ + 2));
+        firmware_info->publish_state(buf);
         break;
+
       case RES_GET_CONNECTOR_BOARD_VERSION:
         memcpy(connector_board_version_, msg, data_[COMMAND_IDX_DATA]);
+        snprintf(buf, sizeof(buf), "%.10s v%0d.%02d", connector_board_version_ + 2, *connector_board_version_, *(connector_board_version_ + 1));
+        connector_board_info->publish_state(buf);
         break;
+
       case RES_GET_FAN_STATUS: {
           if (intake_fan_speed != nullptr) {
             intake_fan_speed->publish_state(msg[0]);
@@ -493,11 +503,11 @@ protected:
         switch(msg[8]) {
           case 0x00:
             fan_mode = climate::CLIMATE_FAN_AUTO;
-            mode = climate::CLIMATE_MODE_AUTO;
+            mode = climate::CLIMATE_MODE_FAN_ONLY;
             break;
           case 0x01:
             fan_mode = climate::CLIMATE_FAN_OFF;
-            mode = climate::CLIMATE_MODE_OFF;
+            mode = climate::CLIMATE_MODE_FAN_ONLY;
             break;
           case 0x02:
             fan_mode = climate::CLIMATE_FAN_LOW;
@@ -923,6 +933,9 @@ protected:
   bool can_send_ventilation_levels_{false};
 
 public:
+  text_sensor::TextSensor *bootloader_info{nullptr};
+  text_sensor::TextSensor *firmware_info{nullptr};
+  text_sensor::TextSensor *connector_board_info{nullptr};
   text_sensor::TextSensor *type{nullptr};
   text_sensor::TextSensor *size{nullptr};
   text_sensor::TextSensor *filter_status{nullptr};
@@ -1007,6 +1020,9 @@ public:
   sensor::Sensor *supply_high_level{nullptr};
   sensor::Sensor *exhaust_high_level{nullptr};
 
+  void set_bootloader_info(text_sensor::TextSensor *bootloader_info) { this->bootloader_info = bootloader_info; };
+  void set_firmware_info(text_sensor::TextSensor *firmware_info) { this->firmware_info = firmware_info; };
+  void set_connector_board_info(text_sensor::TextSensor *connector_board_info) { this->connector_board_info = connector_board_info; };
   void set_type(text_sensor::TextSensor *type) { this->type = type; };
   void set_size(text_sensor::TextSensor *size) { this->size = size; };
   void set_intake_fan_speed(sensor::Sensor *intake_fan_speed) { this->intake_fan_speed = intake_fan_speed; };
