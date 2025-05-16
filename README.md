@@ -1,176 +1,63 @@
-# ComfoAir
-Port of the ComfoAir protocol to ESPHome.io firmware, which is supported by external_components.
+![ComfoAir Controller Banner](images/banner.png)
 
-Add the following definition of `external_components` to your yaml configuration:
+[![GPLv3 License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Get Hardware](https://img.shields.io/badge/Shop-Get_Plug--Play_Solution-8A2BE2)](https://shop.svenar.nl)
 
-```
-external_components:
-  - source:
-      type: git
-      url: https://github.com/wichers/esphome-comfoair
-    components: [comfoair]
-```
-and then use it:
-```
-uart:
-  id: uart_bus
-  rx_pin: 3
-  tx_pin: 1
-  baud_rate: 9600
+ESPHome-powered controller for Zehnder WHR / CA ventilation units that integrate seamlessly with Home Assistant.
 
-comfoair:
-  name: "ComfoAir 350"
-  uart_id: uart_bus
-  type:
-    name: "type"
-  size:
-    name: "size"
-  intake_fan_speed:
-    name: "intake_fan_speed"
-  exhaust_fan_speed:
-    name: "exhaust_fan_speed"
-  intake_fan_speed_rpm:
-    name: "intake_fan_speed_rpm"
-  exhaust_fan_speed_rpm:
-    name: "exhaust_fan_speed_rpm"
-  ventilation_level:
-    name: "ventilation_level"
-  bypass_present:
-    name: "bypass_present"
-  bypass_valve:
-    name: "bypass_valve"
-  bypass_valve_open:
-    name: "bypass_valve_open"
-  preheating_state:
-    name: "preheating_state"
-  outside_air_temperature:
-    name: "outside_air_temperature"
-  supply_air_temperature:
-    name: "supply_air_temperature"
-  return_air_temperature:
-    name: "return_air_temperature"
-  exhaust_air_temperature:
-    name: "exhaust_air_temperature"
-  enthalpy_temperature:
-    name: "enthalpy_temperature"
-  ewt_temperature:
-    name: "ewt_temperature"
-  reheating_temperature:
-    name: "reheating_temperature"
-  kitchen_hood_temperature:
-    name: "kitchen_hood_temperature"
-  return_air_level:
-    name: "return_air_level"
-  supply_air_level:
-    name: "supply_air_level"
-  supply_fan_active:
-    name: "supply_fan_active"
-  filter_status:
-    name: "filter_status"
-  enthalpy_present:
-    name: "enthalpy_present"
-  ewt_present:
-    name: "ewt_present"
-  options_present:
-    name: "options_present"
-  preheating_present:
-    name: "preheating_present"
-  bypass_factor:
-    name: "bypass_factor"
-  bypass_step:
-    name: "bypass_step"
-  bypass_correction:
-    name: "bypass_correction"
-  bypass_open_hours:
-    name: "bypass_open_hours"
-  preheating_hours:
-    name: "preheating_hours"
-  level0_hours:
-    name: "level0_hours"
-  level1_hours:
-    name: "level1_hours"
-  level2_hours:
-    name: "level2_hours"
-  level3_hours:
-    name: "level3_hours"
-  preheating_valve:
-    name: "preheating_valve"
-  frost_protection_active:
-    name: "frost_protection_active"
-  frost_protection_hours:
-    name: "frost_protection_hours"
-  frost_protection_minutes:
-    name: "frost_protection_minutes"
-  frost_protection_level:
-    name: "frost_protection_level"
-  filter_hours:
-    name: "filter_hours"
-  motor_current_bypass:
-    name: "motor_current_bypass"
-  motor_current_preheating:
-    name: "motor_current_preheating"
-  summer_mode:
-    name: "summer_mode"
-  p10_active:
-    name: "p10_active"
-  p11_active:
-    name: "p11_active"
-  p12_active:
-    name: "p12_active"
-  p13_active:
-    name: "p13_active"
-  p14_active:
-    name: "p14_active"
-  p15_active:
-    name: "p15_active"
-  p16_active:
-    name: "p16_active"
-  p17_active:
-    name: "p17_active"
-  p18_active:
-    name: "p18_active"
-  p19_active:
-    name: "p19_active"
-  p90_active:
-    name: "p90_active"
-  p91_active:
-    name: "p91_active"
-  p92_active:
-    name: "p92_active"
-  p93_active:
-    name: "p93_active"
-  p94_active:
-    name: "p94_active"
-  p95_active:
-    name: "p95_active"
-  p96_active:
-    name: "p96_active"
-  p97_active:
-    name: "p97_active"
-  bathroom_switch_on_delay_minutes:
-    name: "bathroom_switch_on_delay_minutes"
-  bathroom_switch_off_delay_minutes:
-    name: "bathroom_switch_off_delay_minutes"
-  l1_switch_off_delay_minutes:
-    name: "l1_switch_off_delay_minutes"
-  boost_ventilation_minutes:
-    name: "boost_ventilation_minutes"
-  filter_warning_weeks:
-    name: "filter_warning_weeks"
-  rf_high_time_short_minutes:
-    name: "rf_high_time_short_minutes"
-  rf_high_time_long_minutes:
-    name: "rf_high_time_long_minutes"
-  extractor_hood_switch_off_delay_minutes:
-    name: "extractor_hood_switch_off_delay_minutes"
+---
+
+![Features](images/features.png)
+
+- **Comprehensive Climate Control**
+  - 📊 Real-time fan speed monitoring
+  - 🌡️ Multi-zone temperature tracking (Supply/Return/Exhaust/Outdoor)
+  - ⚙️ Bypass & preheating status visualization
+  - ↕️ Set ventilation level (Absent(Off) / Low / Medium / High)
+  - 🌀 Set ventilation speed per level
+  - ❄️ Frost protection monitoring
+  - ⏲️ Operation hour tracking
+  - 🏠 Home Assistant climate entity support
+  - 🔄 Automatic firmware updates (Using ESPHome-builder)
+
+---
+
+![Hardware](images/hardware.png)
+
+Recommended hardware:
+* ESP32 board
+* MAX3232 board
+
+For plug-and-play solutions, visit [shop.svenar.nl](https://shop.svenar.nl)
+
+---
+
+![Build & Deploy](images/build_and_deploy.png)
+
+## Using ESPHome CLI
+
+https://esphome.io/guides/cli.html
+
+```sh
+$ esphome build comfoair.yaml
+$ esphome upload comfoair.yaml
 ```
 
-The sensor defined here is a full list of sensors - if you remove a sensor from the yaml definition it will not be monitored.
+## Using ESPHome-builder
 
-For visualization:
-Checkout https://github.com/wichers/lovelace-comfoair and follow the instructions.
+https://esphome.io/guides/getting_started_hassio.html
 
-## Support my work
-Thank you for thinking about supporting my work.
+1. Install the ESPHome-builder addin inside Home Assistant
+2. Add the `comfoair.yaml` config
+3. Build and upload
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/wichers)
+---
+
+![Credits](images/credits.png)
+
+This project builds upon the foundational work by [Wichers](https://github.com/wichers/esphome-comfoair).  
+
+---
+
+![License](images/license.png)
+
+**License**: GNU General Public License v3.0 - See [LICENSE](LICENSE) for details.
