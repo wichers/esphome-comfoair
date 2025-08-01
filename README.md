@@ -182,6 +182,8 @@ Checkout https://github.com/wichers/lovelace-comfoair and follow the instruction
 
 This is a list of models that are known to work, feel free to add yours if you tested it successfully:
 
+* Zehnder WHR 930
+* Zehnder WHR 950
 * Zehnder ComfoAir 160
 * Zehnder ComfoAir 200
 * Zehnder Comfoair 550
