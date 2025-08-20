@@ -340,10 +340,10 @@ protected:
             exhaust_fan_speed->publish_state(msg[1]);
           }
           if (intake_fan_speed_rpm != nullptr) {
-            intake_fan_speed_rpm->publish_state(1875000.0f / get_uint16_(2));
+            intake_fan_speed_rpm->publish_state(static_cast<int>(1875000.0f / get_uint16_(2)));
           }
           if (exhaust_fan_speed_rpm != nullptr) {
-            exhaust_fan_speed_rpm->publish_state(1875000.0f / get_uint16_(4));
+            exhaust_fan_speed_rpm->publish_state(static_cast<int>(1875000.0f / get_uint16_(4)));
           }
           break;
         }
@@ -926,8 +926,8 @@ public:
   void set_size(text_sensor::TextSensor *size) { this->size = size; };
   void set_intake_fan_speed(sensor::Sensor *intake_fan_speed) { this->intake_fan_speed = intake_fan_speed; };
   void set_exhaust_fan_speed(sensor::Sensor *exhaust_fan_speed) { this->exhaust_fan_speed = exhaust_fan_speed; };
-  void set_intake_fan_speed_rpm(sensor::Sensor *intake_fan_speed_rpm) { this->intake_fan_speed_rpm = intake_fan_speed_rpm; };
-  void set_exhaust_fan_speed_rpm(sensor::Sensor *exhaust_fan_speed_rpm) { this->exhaust_fan_speed_rpm = exhaust_fan_speed_rpm; };
+  void set_intake_fan_speed_rpm(sensor::Sensor *intake_fan_speed_rpm) { this->intake_fan_speed_rpm = intake_fan_speed_rpm; this->intake_fan_speed_rpm->set_accuracy_decimals(0); };
+  void set_exhaust_fan_speed_rpm(sensor::Sensor *exhaust_fan_speed_rpm) { this->exhaust_fan_speed_rpm = exhaust_fan_speed_rpm; this->exhaust_fan_speed_rpm->set_accuracy_decimals(0); };
   void set_ventilation_level(sensor::Sensor *ventilation_level) { this->ventilation_level = ventilation_level; };
   void set_bypass_valve(sensor::Sensor *bypass_valve) { this->bypass_valve = bypass_valve; };
   void set_bypass_present(binary_sensor::BinarySensor *bypass_present) { this->bypass_present = bypass_present; };
