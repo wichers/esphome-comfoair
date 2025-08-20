@@ -2,16 +2,16 @@
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, text_sensor, uart
+from esphome.components import binary_sensor, sensor, text_sensor, uart, climate
 from esphome.const import (CONF_ID, CONF_UART_ID, DEVICE_CLASS_CURRENT,
                            DEVICE_CLASS_EMPTY, DEVICE_CLASS_SPEED,
                            DEVICE_CLASS_TEMPERATURE, DEVICE_CLASS_VOLUME,
                            STATE_CLASS_MEASUREMENT, UNIT_AMPERE, UNIT_CELSIUS,
                            UNIT_CUBIC_METER, UNIT_HOUR, UNIT_MINUTE,
-                           UNIT_PERCENT, UNIT_REVOLUTIONS_PER_MINUTE)
+                           UNIT_PERCENT, UNIT_REVOLUTIONS_PER_MINUTE, CONF_DISABLED_BY_DEFAULT)
 
 comfoair_ns = cg.esphome_ns.namespace("comfoair")
-ComfoAirComponent = comfoair_ns.class_("ComfoAirComponent", cg.Component)
+ComfoAirComponent = comfoair_ns.class_('ComfoAirComponent', climate.Climate, cg.Component, uart.UARTDevice)
 
 DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor"]
@@ -513,7 +513,7 @@ comfoair_sensors_schemas = cv.Schema(
 )
 
 CONFIG_SCHEMA = cv.All(
-    cv.Schema(
+    climate.CLIMATE_SCHEMA.extend(
         {
             cv.GenerateID(CONF_ID): cv.declare_id(ComfoAirComponent),
             cv.Required(REQUIRED_KEY_NAME): cv.string,
@@ -521,7 +521,6 @@ CONFIG_SCHEMA = cv.All(
     )
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(comfoair_sensors_schemas)
-    .extend(cv.COMPONENT_SCHEMA)
 )
 
 
@@ -530,6 +529,7 @@ def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     yield cg.register_component(var, config)
     yield uart.register_uart_device(var, config)
+    yield climate.register_climate(var, config)
     cg.add(var.set_name(config[REQUIRED_KEY_NAME]))
     paren = yield cg.get_variable(config[CONF_UART_ID])
     cg.add(var.set_uart_component(paren))
@@ -547,4 +547,3 @@ def to_code(config):
             if sens is not None:
                 func = getattr(var, "set_" + v)
                 cg.add(func(sens))
-    cg.add(cg.App.register_climate(var))
