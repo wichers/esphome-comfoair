@@ -513,9 +513,9 @@ comfoair_sensors_schemas = cv.Schema(
 )
 
 CONFIG_SCHEMA = cv.All(
-    climate.CLIMATE_SCHEMA.extend(
+    climate.climate_schema(ComfoAirComponent)
+    .extend(
         {
-            cv.GenerateID(CONF_ID): cv.declare_id(ComfoAirComponent),
             cv.Required(REQUIRED_KEY_NAME): cv.string,
         }
     )
