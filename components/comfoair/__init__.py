@@ -512,17 +512,16 @@ comfoair_sensors_schemas = cv.Schema(
     }
 )
 
-CONFIG_SCHEMA = cv.All(
-    climate.CLIMATE_SCHEMA.extend(
-        {
-            cv.GenerateID(CONF_ID): cv.declare_id(ComfoAirComponent),
-            cv.Required(REQUIRED_KEY_NAME): cv.string,
-        }
-    )
-    .extend(uart.UART_DEVICE_SCHEMA)
-    .extend(comfoair_sensors_schemas)
+CONFIG_SCHEMA = (
+  climate.climate_schema(ComfoAirComponent)
+  .extend(
+    {
+      cv.Required(REQUIRED_KEY_NAME): cv.string,
+    }
+  )
+  .extend(uart.UART_DEVICE_SCHEMA)
+  .extend(comfoair_sensors_schemas)
 )
-
 
 def to_code(config):
     """Generates code"""
