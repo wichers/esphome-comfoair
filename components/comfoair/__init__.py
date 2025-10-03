@@ -2,7 +2,7 @@
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, text_sensor, uart, climate
+from esphome.components import binary_sensor, sensor, text_sensor, uart, climate, select
 from esphome.const import (CONF_ID, CONF_UART_ID, DEVICE_CLASS_CURRENT,
                            DEVICE_CLASS_EMPTY, DEVICE_CLASS_SPEED,
                            DEVICE_CLASS_TEMPERATURE, DEVICE_CLASS_VOLUME,
@@ -14,7 +14,7 @@ comfoair_ns = cg.esphome_ns.namespace("comfoair")
 ComfoAirComponent = comfoair_ns.class_('ComfoAirComponent', climate.Climate, cg.Component, uart.UARTDevice)
 
 DEPENDENCIES = ["uart"]
-AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor"]
+AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor", "select"]
 REQUIRED_KEY_NAME = "name"
 CONF_HUB_ID = "comfoair"
 
@@ -22,6 +22,7 @@ UNIT_WEEK = "weeks"
 
 CONF_TYPE = "type"
 CONF_SIZE = "size"
+CONF_SIZE_SELECT = "size_select"
 CONF_INTAKE_FAN_SPEED = "intake_fan_speed"
 CONF_EXHAUST_FAN_SPEED = "exhaust_fan_speed"
 CONF_INTAKE_FAN_SPEED_RPM = "intake_fan_speed_rpm"
@@ -181,7 +182,12 @@ helper_comfoair = {
         CONF_FROST_PROTECTION_LEVEL,
         CONF_PREHEATING_VALVE,
     ],
+    "select": [
+        CONF_SIZE_SELECT,
+    ],
 }
+
+ComfoAirSizeSelect = comfoair_ns.class_("ComfoAirSizeSelect", select.Select)
 
 comfoair_sensors_schemas = cv.Schema(
     {
@@ -190,6 +196,9 @@ comfoair_sensors_schemas = cv.Schema(
         cv.Optional(CONF_FILTER_STATUS): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_FROST_PROTECTION_LEVEL): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_PREHEATING_VALVE): text_sensor.text_sensor_schema(),
+        cv.Optional(CONF_SIZE_SELECT, default={}): select.select_schema(
+            ComfoAirSizeSelect
+        ).extend(),
 
         cv.Optional(CONF_INTAKE_FAN_SPEED): sensor.sensor_schema(
             device_class=DEVICE_CLASS_SPEED,
@@ -543,6 +552,8 @@ def to_code(config):
                 sens = yield binary_sensor.new_binary_sensor(config[v])
             elif k == "text_sensor":
                 sens = yield text_sensor.new_text_sensor(config[v])
+            elif k == "select":
+                sens = yield select.new_select(config[v], options=["Large", "Small"])
             if sens is not None:
                 func = getattr(var, "set_" + v)
                 cg.add(func(sens))

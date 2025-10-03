@@ -7,6 +7,7 @@
 #include "esphome/components/climate/climate_mode.h"
 #include "esphome/components/climate/climate_traits.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/select/select.h"
 #include "registers.h"
 
 namespace esphome {
@@ -14,7 +15,21 @@ namespace comfoair {
 
 static const char *TAG = "comfoair";
 
+class ComfoAirComponent;
+
+class ComfoAirSizeSelect : public select::Select {
+ public:
+  void set_parent(ComfoAirComponent *parent) { this->parent_ = parent; }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  ComfoAirComponent *parent_{nullptr};
+};
+
 class ComfoAirComponent : public climate::Climate, public PollingComponent, public uart::UARTDevice {
+  friend class ComfoAirSizeSelect;
 public:
 
   // Poll every 600ms
@@ -198,6 +213,8 @@ public:
 
   void set_name(const char* value) {name = value;}
   void set_uart_component(uart::UARTComponent *parent) {set_uart_parent(parent);}
+  bool set_unit_size(uint8_t raw_size);
+  void set_size_select(ComfoAirSizeSelect *size_select);
 
 protected:
 
@@ -231,32 +248,45 @@ protected:
     write_byte(COMMAND_PREFIX);
     write_byte(COMMAND_HEAD);
     write_byte(0x00);
-    write_byte(command);
-    write_byte(command_data_length);
-    if (command_data_length > 0) {
-      write_array(command_data, command_data_length);
-      write_byte((command + command_data_length + comfoair_checksum_(command_data, command_data_length)) & 0xff);
-    } else {
-      write_byte(comfoair_checksum_(&command, 1));
+
+    uint16_t checksum = 173;
+    checksum += command;
+    checksum += command_data_length;
+
+    write_escaped_byte_(command);
+    write_escaped_byte_(command_data_length);
+
+    for (uint8_t i = 0; i < command_data_length; i++) {
+      uint8_t data_byte = command_data[i];
+      checksum += data_byte;
+      write_escaped_byte_(data_byte);
     }
+
+    uint8_t checksum_byte = static_cast<uint8_t>(checksum & 0xFF);
+    write_escaped_byte_(checksum_byte);
+
     write_byte(COMMAND_PREFIX);
     write_byte(COMMAND_TAIL);
     flush();
-}
+  }
 
-  uint8_t comfoair_checksum_(const uint8_t *command_data, uint8_t length) const {
-    uint8_t sum = 173;
-    bool skip = false;
-    for (uint8_t i = 0; i < length; i++) {
-      if (command_data[i] == 0x07) {
-        if (skip)
-          continue;
-        else
-          skip = true;
-      }
-      sum += command_data[i];
+  void write_escaped_byte_(uint8_t value) {
+    write_byte(value);
+    if (value == COMMAND_PREFIX) {
+      write_byte(value);
     }
-    return sum % 256;
+  }
+
+  uint8_t comfoair_checksum_(uint8_t command, uint8_t length, const uint8_t *command_data) const {
+    uint16_t sum = 173;
+    sum += command;
+    sum += length;
+    if (command_data != nullptr) {
+      for (uint8_t i = 0; i < length; i++) {
+        sum += command_data[i];
+      }
+    }
+    return static_cast<uint8_t>(sum & 0xFF);
   }
 
   optional<bool> check_byte_() const {
@@ -296,7 +326,8 @@ protected:
 
     if (index == COMMAND_LEN_HEAD + data_length) {
       // checksum is without checksum bytes
-      uint8_t checksum = comfoair_checksum_(data_ + 2, COMMAND_LEN_HEAD + data_length - 2);
+      uint8_t checksum = comfoair_checksum_(
+          data_[COMMAND_IDX_MSG_ID], data_length, data_ + COMMAND_LEN_HEAD);
       if (checksum != byte) {
         //ESP_LOGW(TAG, "%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X", data_[0], data_[1], data_[2], data_[3], data_[4], data_[5], data_[6], data_[7], data_[8], data_[9], data_[10]);
         ESP_LOGW(TAG, "ComfoAir Checksum doesn't match: 0x%02X!=0x%02X", byte, checksum);
@@ -513,9 +544,7 @@ protected:
           type->publish_state(msg[2] == 1 ? "Left" : (msg[2] == 2 ? "Right" : "Unknown"));
         }
 
-        if (size != nullptr) {
-          size->publish_state(msg[3] == 1 ? "Large" : (msg[3] == 2 ? "Small" : "Unknown"));
-        }
+        publish_size_entities_(msg[3]);
 
         if (options_present != nullptr) {
           options_present->publish_state(msg[4]);
@@ -615,6 +644,20 @@ protected:
 
         if (ewt_present != nullptr) {
           ewt_present->publish_state(msg[10]);
+        }
+
+        if (data_[COMMAND_IDX_DATA] >= 11) {
+          status_payload_[0] = msg[0];
+          status_payload_[1] = msg[1];
+          status_payload_[2] = msg[2];
+          status_payload_[3] = msg[3];
+          status_payload_[4] = msg[4];
+          status_payload_[5] = msg[5];
+          status_payload_[6] = msg[9];
+          status_payload_[7] = msg[10];
+          status_payload_valid_ = true;
+        } else {
+          status_payload_valid_ = false;
         }
         break;
       }
@@ -835,10 +878,18 @@ protected:
     return (uint16_t(data_[COMMAND_LEN_HEAD + start_index + 1] | data_[COMMAND_LEN_HEAD + start_index] << 8));
   }
 
+  void publish_size_entities_(uint8_t raw_size);
+  const char *unit_size_text_label_(uint8_t raw_size) const;
+  const char *unit_size_option_label_(uint8_t raw_size) const;
+
   uint8_t data_[30];
   uint8_t data_index_{0};
   int8_t update_counter_{-4};
   const int8_t num_update_counter_elements_{9};
+  uint8_t status_payload_[8]{0};
+  bool status_payload_valid_{false};
+  uint8_t current_unit_size_{0};
+  ComfoAirSizeSelect *size_select_{nullptr};
 
   uint8_t bootloader_version_[13]{0};
   uint8_t firmware_version_[13]{0};
@@ -997,7 +1048,116 @@ public:
   void set_rf_high_time_short_minutes(sensor::Sensor *rf_high_time_short_minutes) { this->rf_high_time_short_minutes = rf_high_time_short_minutes; };
   void set_rf_high_time_long_minutes(sensor::Sensor *rf_high_time_long_minutes) { this->rf_high_time_long_minutes = rf_high_time_long_minutes; };
   void set_extractor_hood_switch_off_delay_minutes(sensor::Sensor *extractor_hood_switch_off_delay_minutes) { this->extractor_hood_switch_off_delay_minutes = extractor_hood_switch_off_delay_minutes; };
+  void set_size_select(ComfoAirSizeSelect *size_select);
 };
+
+inline const char *ComfoAirComponent::unit_size_text_label_(uint8_t raw_size) const {
+  switch (raw_size) {
+    case 1:
+      return "Large";
+    case 2:
+      return "Small";
+    default:
+      return "Unknown";
+  }
+}
+
+inline const char *ComfoAirComponent::unit_size_option_label_(uint8_t raw_size) const {
+  switch (raw_size) {
+    case 1:
+      return "Large";
+    case 2:
+      return "Small";
+    default:
+      return nullptr;
+  }
+}
+
+inline void ComfoAirComponent::publish_size_entities_(uint8_t raw_size) {
+  current_unit_size_ = raw_size;
+  if (size != nullptr) {
+    size->publish_state(unit_size_text_label_(raw_size));
+  }
+  if (size_select_ != nullptr) {
+    if (const char *option = unit_size_option_label_(raw_size)) {
+      size_select_->publish_state(option);
+    } else {
+      ESP_LOGW(TAG, "Unsupported unit size value: %u", raw_size);
+    }
+  }
+}
+
+inline bool ComfoAirComponent::set_unit_size(uint8_t raw_size) {
+  if (raw_size != 1 && raw_size != 2) {
+    ESP_LOGW(TAG, "Ignoring invalid unit size request: %u", raw_size);
+    return false;
+  }
+
+  if (!status_payload_valid_) {
+    ESP_LOGW(TAG, "Unit size cannot be changed before initial status is received");
+    publish_size_entities_(current_unit_size_);
+    return false;
+  }
+
+  if (status_payload_[3] == raw_size) {
+    publish_size_entities_(raw_size);
+    return true;
+  }
+
+  uint8_t payload[sizeof(status_payload_)];
+  memcpy(payload, status_payload_, sizeof(status_payload_));
+  payload[3] = raw_size;
+
+  ESP_LOGI(TAG, "Setting unit size to %s", unit_size_text_label_(raw_size));
+  write_command_(CMD_SET_STATUS, payload, sizeof(payload));
+
+  status_payload_[3] = raw_size;
+  publish_size_entities_(raw_size);
+
+  return true;
+}
+
+inline void ComfoAirComponent::set_size_select(ComfoAirSizeSelect *size_select) {
+  this->size_select_ = size_select;
+  if (this->size_select_ != nullptr) {
+    this->size_select_->set_parent(this);
+    if (const char *option = this->unit_size_option_label_(this->current_unit_size_)) {
+      this->size_select_->publish_state(option);
+    }
+  }
+}
+
+inline void ComfoAirSizeSelect::control(const std::string &value) {
+  if (this->parent_ == nullptr) {
+    ESP_LOGW(TAG, "Unit size select has no parent component configured");
+    return;
+  }
+
+  auto index = this->index_of(value);
+  if (!index.has_value()) {
+    ESP_LOGW(TAG, "Unit size select received invalid option: %s", value.c_str());
+    return;
+  }
+
+  uint8_t raw_size = 0;
+  switch (index.value()) {
+    case 0:
+      raw_size = 1;
+      break;
+    case 1:
+      raw_size = 2;
+      break;
+    default:
+      ESP_LOGW(TAG, "Unit size select index %zu not supported", index.value());
+      return;
+  }
+
+  if (!this->parent_->set_unit_size(raw_size)) {
+    if (const char *current_option = this->parent_->unit_size_option_label_(this->parent_->current_unit_size_)) {
+      this->publish_state(current_option);
+    }
+  }
+}
 
 }  // namespace comfoair
 }  // namespace esphome
