@@ -25,6 +25,8 @@ comfoair:
     name: "type"
   size:
     name: "size"
+  size_select:
+    name: "unit_size"
   intake_fan_speed:
     name: "intake_fan_speed"
   exhaust_fan_speed:
@@ -174,6 +176,8 @@ comfoair:
 ```
 
 The sensor defined here is a full list of sensors - if you remove a sensor from the yaml definition it will not be monitored.
+
+> **Warning:** The `size_select` entity exposes the ComfoAir unit size (large/small) for installer configuration. Changing this setting should be done sparingly and only when you know the correct unit size for your installation.
 
 For visualization:
 Checkout https://github.com/wichers/lovelace-comfoair and follow the instructions.
