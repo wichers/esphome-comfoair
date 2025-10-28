@@ -110,6 +110,8 @@ comfoair:
     name: "Type"
   size:
     name: "Size"
+  size_select:
+    name: "unit_size"
   intake_fan_speed:
     name: "Supply air level"
   exhaust_fan_speed:
