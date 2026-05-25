@@ -2,19 +2,22 @@
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, text_sensor, uart, climate, select
+from esphome.components import binary_sensor, sensor, text_sensor, uart, climate, select, number, button
 from esphome.const import (CONF_ID, CONF_UART_ID, DEVICE_CLASS_CURRENT,
                            DEVICE_CLASS_EMPTY, DEVICE_CLASS_SPEED,
                            DEVICE_CLASS_TEMPERATURE, DEVICE_CLASS_VOLUME,
                            STATE_CLASS_MEASUREMENT, UNIT_AMPERE, UNIT_CELSIUS,
                            UNIT_CUBIC_METER, UNIT_HOUR, UNIT_MINUTE,
-                           UNIT_PERCENT, UNIT_REVOLUTIONS_PER_MINUTE, CONF_DISABLED_BY_DEFAULT)
+                           UNIT_PERCENT, UNIT_REVOLUTIONS_PER_MINUTE, CONF_DISABLED_BY_DEFAULT,
+                           ICON_FAN, CONF_ICON, CONF_INITIAL_VALUE, CONF_MIN_VALUE, CONF_MAX_VALUE, CONF_STEP)
 
 comfoair_ns = cg.esphome_ns.namespace("comfoair")
 ComfoAirComponent = comfoair_ns.class_('ComfoAirComponent', climate.Climate, cg.Component, uart.UARTDevice)
+ComfoAirNumber = comfoair_ns.class_("ComfoAirNumber", number.Number)
+ComfoAirSyncButton = comfoair_ns.class_("ComfoAirSyncButton", button.Button)
 
 DEPENDENCIES = ["uart"]
-AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor", "select"]
+AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor", "select", "number", "button"]
 REQUIRED_KEY_NAME = "name"
 CONF_HUB_ID = "comfoair"
 
@@ -98,6 +101,17 @@ CONF_FILTER_WARNING_WEEKS = "filter_warning_weeks"
 CONF_RF_HIGH_TIME_SHORT_MINUTES = "rf_high_time_short_minutes"
 CONF_RF_HIGH_TIME_LONG_MINUTES = "rf_high_time_long_minutes"
 CONF_EXTRACTOR_HOOD_SWITCH_OFF_DELAY_MINUTES = "extractor_hood_switch_off_delay_minutes"
+
+CONF_RETURN_AIR_LEVEL_ABSENT = "return_air_level_absent"
+CONF_RETURN_AIR_LEVEL_LOW = "return_air_level_low"
+CONF_RETURN_AIR_LEVEL_MEDIUM = "return_air_level_medium"
+CONF_RETURN_AIR_LEVEL_HIGH = "return_air_level_high"
+CONF_SUPPLY_AIR_LEVEL_ABSENT = "supply_air_level_absent"
+CONF_SUPPLY_AIR_LEVEL_LOW = "supply_air_level_low"
+CONF_SUPPLY_AIR_LEVEL_MEDIUM = "supply_air_level_medium"
+CONF_SUPPLY_AIR_LEVEL_HIGH = "supply_air_level_high"
+
+CONF_SYNC_FAN_LEVELS = "sync_fan_levels"
 
 helper_comfoair = {
     "sensor": [
@@ -184,6 +198,19 @@ helper_comfoair = {
     ],
     "select": [
         CONF_SIZE_SELECT,
+    ],
+    "number": [
+        CONF_RETURN_AIR_LEVEL_ABSENT,
+        CONF_RETURN_AIR_LEVEL_LOW,
+        CONF_RETURN_AIR_LEVEL_MEDIUM,
+        CONF_RETURN_AIR_LEVEL_HIGH,
+        CONF_SUPPLY_AIR_LEVEL_ABSENT,
+        CONF_SUPPLY_AIR_LEVEL_LOW,
+        CONF_SUPPLY_AIR_LEVEL_MEDIUM,
+        CONF_SUPPLY_AIR_LEVEL_HIGH,
+    ],
+    "button": [
+        CONF_SYNC_FAN_LEVELS,
     ],
 }
 
@@ -518,6 +545,91 @@ comfoair_sensors_schemas = cv.Schema(
         cv.Optional(CONF_P97_ACTIVE): binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
+
+        cv.Optional(CONF_RETURN_AIR_LEVEL_ABSENT): number.number_schema(
+            ComfoAirNumber,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_FAN,
+        ).extend({
+            cv.Optional(CONF_INITIAL_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+            cv.Optional(CONF_STEP, default=1): cv.positive_float,
+        }),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_LOW): number.number_schema(
+            ComfoAirNumber,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_FAN,
+        ).extend({
+            cv.Optional(CONF_INITIAL_VALUE, default=35): cv.positive_float,
+            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+            cv.Optional(CONF_STEP, default=1): cv.positive_float,
+        }),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_MEDIUM): number.number_schema(
+            ComfoAirNumber,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_FAN,
+        ).extend({
+            cv.Optional(CONF_INITIAL_VALUE, default=50): cv.positive_float,
+            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+            cv.Optional(CONF_STEP, default=1): cv.positive_float,
+        }),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_HIGH): number.number_schema(
+            ComfoAirNumber,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_FAN,
+        ).extend({
+            cv.Optional(CONF_INITIAL_VALUE, default=70): cv.positive_float,
+            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+            cv.Optional(CONF_STEP, default=1): cv.positive_float,
+        }),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_ABSENT): number.number_schema(
+            ComfoAirNumber,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_FAN,
+        ).extend({
+            cv.Optional(CONF_INITIAL_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+            cv.Optional(CONF_STEP, default=1): cv.positive_float,
+        }),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_LOW): number.number_schema(
+            ComfoAirNumber,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_FAN,
+        ).extend({
+            cv.Optional(CONF_INITIAL_VALUE, default=35): cv.positive_float,
+            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+            cv.Optional(CONF_STEP, default=1): cv.positive_float,
+        }),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_MEDIUM): number.number_schema(
+            ComfoAirNumber,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_FAN,
+        ).extend({
+            cv.Optional(CONF_INITIAL_VALUE, default=50): cv.positive_float,
+            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+            cv.Optional(CONF_STEP, default=1): cv.positive_float,
+        }),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_HIGH): number.number_schema(
+            ComfoAirNumber,
+            unit_of_measurement=UNIT_PERCENT,
+            icon=ICON_FAN,
+        ).extend({
+            cv.Optional(CONF_INITIAL_VALUE, default=70): cv.positive_float,
+            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+            cv.Optional(CONF_STEP, default=1): cv.positive_float,
+        }),
+        cv.Optional(CONF_SYNC_FAN_LEVELS): button.button_schema(
+            ComfoAirSyncButton,
+            icon="mdi:sync",
+        ).extend(),
     }
 )
 
@@ -554,6 +666,15 @@ def to_code(config):
                 sens = yield text_sensor.new_text_sensor(config[v])
             elif k == "select":
                 sens = yield select.new_select(config[v], options=["Large", "Small"])
+            elif k == "number":
+                sens = yield number.new_number(
+                    config[v],
+                    min_value=config[v][CONF_MIN_VALUE],
+                    max_value=config[v][CONF_MAX_VALUE],
+                    step=config[v][CONF_STEP],
+                    )
+            elif k == "button":
+                sens = yield button.new_button(config[v])
             if sens is not None:
                 func = getattr(var, "set_" + v)
                 cg.add(func(sens))

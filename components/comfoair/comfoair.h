@@ -9,6 +9,8 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/number/number.h"
+#include "esphome/components/button/button.h"
 #include "registers.h"
 
 namespace esphome
@@ -32,9 +34,35 @@ namespace esphome
       ComfoAirComponent *parent_{nullptr};
     };
 
+    class ComfoAirNumber : public number::Number
+    {
+    public:
+      void set_parent(ComfoAirComponent *parent) { this->parent_ = parent; }
+
+    protected:
+      void control(float value) override;
+
+    private:
+      ComfoAirComponent *parent_{nullptr};
+    };
+
+    class ComfoAirSyncButton : public button::Button
+    {
+    public:
+      void set_parent(ComfoAirComponent *parent) { this->parent_ = parent; }
+
+    protected:
+      void press_action() override;
+
+    private:
+      ComfoAirComponent *parent_{nullptr};
+    };
+
     class ComfoAirComponent : public climate::Climate, public PollingComponent, public uart::UARTDevice
     {
       friend class ComfoAirSizeSelect;
+      friend class ComfoAirSyncButton;
+      friend class ComfoAirNumber;
 
     public:
       // Poll every 600ms
@@ -265,6 +293,32 @@ namespace esphome
           uint8_t command[1] = {(uint8_t)((temperature + 20.0f) * 2.0f)};
           write_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
         }
+      }
+
+      void set_fan_percentages()
+      {
+        // Ensure all numbers are linked before proceeding
+        if (!return_air_level_absent || !return_air_level_low || !return_air_level_medium || !return_air_level_high ||
+            !supply_air_level_absent || !supply_air_level_low || !supply_air_level_medium || !supply_air_level_high) {
+            ESP_LOGW("comfoair", "Cannot sync: One or more fan level entities are missing.");
+            return;
+        }
+
+        uint8_t data[9];
+        // Map states to bytes according to 0xCF specification
+        // std::clamp provides a final hardware safety check
+        data[0] = (uint8_t)std::clamp((int)return_air_level_absent->state, 15, 95);
+        data[1] = (uint8_t)std::clamp((int)return_air_level_low->state, 15, 95);
+        data[2] = (uint8_t)std::clamp((int)return_air_level_medium->state, 15, 95);
+        data[3] = (uint8_t)std::clamp((int)supply_air_level_absent->state, 15, 95);
+        data[4] = (uint8_t)std::clamp((int)supply_air_level_low->state, 15, 95);
+        data[5] = (uint8_t)std::clamp((int)supply_air_level_medium->state, 15, 95);
+        data[6] = (uint8_t)std::clamp((int)return_air_level_high->state, 15, 95);
+        data[7] = (uint8_t)std::clamp((int)supply_air_level_high->state, 15, 95);
+        data[8] = 0x00; // Reserved/Padding
+
+        ESP_LOGD("comfoair", "Sending 0xCF: Setting fan speed percentages.");
+        write_command_(CMD_SET_VENTILATION_LEVEL, data, sizeof(data));
       }
 
       void write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length)
@@ -552,6 +606,18 @@ namespace esphome
             mode = climate::CLIMATE_MODE_FAN_ONLY;
             break;
           }
+
+          // Update Return Air (Exhaust) Numbers
+          if (return_air_level_absent != nullptr) return_air_level_absent->publish_state(msg[0]);
+          if (return_air_level_low != nullptr)    return_air_level_low->publish_state(msg[1]);
+          if (return_air_level_medium != nullptr) return_air_level_medium->publish_state(msg[2]);
+          if (return_air_level_high != nullptr)   return_air_level_high->publish_state(msg[10]);
+
+          // Update Supply Air Numbers
+          if (supply_air_level_absent != nullptr) supply_air_level_absent->publish_state(msg[3]);
+          if (supply_air_level_low != nullptr)    supply_air_level_low->publish_state(msg[4]);
+          if (supply_air_level_medium != nullptr) supply_air_level_medium->publish_state(msg[5]);
+          if (supply_air_level_high != nullptr)   supply_air_level_high->publish_state(msg[11]);
 
           publish_state();
 
@@ -1135,6 +1201,15 @@ namespace esphome
       sensor::Sensor *rf_high_time_short_minutes{nullptr};
       sensor::Sensor *rf_high_time_long_minutes{nullptr};
       sensor::Sensor *extractor_hood_switch_off_delay_minutes{nullptr};
+      ComfoAirNumber *return_air_level_absent{nullptr};
+      ComfoAirNumber *return_air_level_low{nullptr};
+      ComfoAirNumber *return_air_level_medium{nullptr};
+      ComfoAirNumber *return_air_level_high{nullptr};
+      ComfoAirNumber *supply_air_level_absent{nullptr};
+      ComfoAirNumber *supply_air_level_low{nullptr};
+      ComfoAirNumber *supply_air_level_medium{nullptr};
+      ComfoAirNumber *supply_air_level_high{nullptr};
+      ComfoAirSyncButton *sync_button_{nullptr};
 
       void set_type(text_sensor::TextSensor *type) { this->type = type; };
       void set_size(text_sensor::TextSensor *size) { this->size = size; };
@@ -1219,6 +1294,69 @@ namespace esphome
       void set_rf_high_time_short_minutes(sensor::Sensor *rf_high_time_short_minutes) { this->rf_high_time_short_minutes = rf_high_time_short_minutes; };
       void set_rf_high_time_long_minutes(sensor::Sensor *rf_high_time_long_minutes) { this->rf_high_time_long_minutes = rf_high_time_long_minutes; };
       void set_extractor_hood_switch_off_delay_minutes(sensor::Sensor *extractor_hood_switch_off_delay_minutes) { this->extractor_hood_switch_off_delay_minutes = extractor_hood_switch_off_delay_minutes; };
+      void set_return_air_level_absent(ComfoAirNumber *n)
+      {
+        this->return_air_level_absent = n;
+        if (this->return_air_level_absent != nullptr) {
+          this->return_air_level_absent->set_parent(this);
+        }
+      };
+      void set_return_air_level_low(ComfoAirNumber *n)
+      {
+        this->return_air_level_low = n;
+        if (this->return_air_level_low != nullptr) {
+          this->return_air_level_low->set_parent(this);
+        }
+      };
+      void set_return_air_level_medium(ComfoAirNumber *n)
+      {
+        this->return_air_level_medium = n;
+        if (this->return_air_level_medium != nullptr) {
+          this->return_air_level_medium->set_parent(this);
+        }
+      };
+      void set_return_air_level_high(ComfoAirNumber *n)
+      {
+        this->return_air_level_high = n;
+        if (this->return_air_level_high != nullptr) {
+          this->return_air_level_high->set_parent(this);
+        }
+      };
+      void set_supply_air_level_absent(ComfoAirNumber *n)
+      {
+        this->supply_air_level_absent = n;
+        if (this->supply_air_level_absent != nullptr) {
+          this->supply_air_level_absent->set_parent(this);
+        }
+      };
+      void set_supply_air_level_low(ComfoAirNumber *n)
+      {
+        this->supply_air_level_low = n;
+        if (this->supply_air_level_low != nullptr) {
+          this->supply_air_level_low->set_parent(this);
+        }
+      };
+      void set_supply_air_level_medium(ComfoAirNumber *n)
+      {
+        this->supply_air_level_medium = n;
+        if (this->supply_air_level_medium != nullptr) {
+          this->supply_air_level_medium->set_parent(this);
+        }
+      };
+      void set_supply_air_level_high(ComfoAirNumber *n)
+      {
+        this->supply_air_level_high = n;
+        if (this->supply_air_level_high != nullptr) {
+          this->supply_air_level_high->set_parent(this);
+        }
+      };
+      void set_sync_fan_levels(ComfoAirSyncButton *b)
+      {
+        this->sync_button_ = b;
+        if (this->sync_button_ != nullptr) {
+          this->sync_button_->set_parent(this);
+        }
+      }
     };
 
     inline const char *ComfoAirComponent::unit_size_text_label_(uint8_t raw_size) const
@@ -1350,6 +1488,18 @@ namespace esphome
           this->publish_state(current_option);
         }
       }
+    }
+
+    inline void ComfoAirNumber::control(float value) {
+      this->publish_state(value);
+      if (this->parent_ != nullptr) {
+        this->parent_->set_fan_percentages();
+      }
+    }
+
+    inline void ComfoAirSyncButton::press_action()
+    {
+      this->parent_->set_fan_percentages();
     }
 
   } // namespace comfoair
