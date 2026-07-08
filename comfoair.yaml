@@ -118,6 +118,8 @@ comfoair:
     name: "supply_fan_active"
   filter_status:
     name: "filter_status"
+  filter_status_full:
+    name: "filter_status_full"
   enthalpy_present:
     name: "enthalpy_present"
   ewt_present:

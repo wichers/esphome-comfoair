@@ -635,6 +635,10 @@ namespace esphome
             uint8_t status = msg[8];
             filter_status->publish_state(status == 0 ? "Ok" : (status == 1 ? "Full" : "Unknown"));
           }
+          if (filter_status_full != nullptr)
+          {
+            filter_status_full->publish_state(msg[8] == 1);
+          }
           break;
         }
         case RES_GET_TEMPERATURES:
@@ -1027,7 +1031,8 @@ namespace esphome
 
       void get_error_status_()
       {
-        if (filter_status != nullptr)
+        if (filter_status != nullptr ||
+            filter_status_full != nullptr)
         {
           ESP_LOGD(TAG, "getting error status");
           write_command_(CMD_GET_FAULTS, nullptr, 0);
@@ -1129,6 +1134,7 @@ namespace esphome
       text_sensor::TextSensor *type{nullptr};
       text_sensor::TextSensor *size{nullptr};
       text_sensor::TextSensor *filter_status{nullptr};
+      binary_sensor::BinarySensor *filter_status_full{nullptr};
       text_sensor::TextSensor *frost_protection_level{nullptr};
       text_sensor::TextSensor *preheating_valve{nullptr};
       sensor::Sensor *intake_fan_speed{nullptr};
@@ -1250,6 +1256,7 @@ namespace esphome
       void set_supply_air_level(sensor::Sensor *supply_air_level) { this->supply_air_level = supply_air_level; };
       void set_supply_fan_active(binary_sensor::BinarySensor *supply_fan_active) { this->supply_fan_active = supply_fan_active; };
       void set_filter_status(text_sensor::TextSensor *filter_status) { this->filter_status = filter_status; };
+      void set_filter_status_full(binary_sensor::BinarySensor *filter_status_full) { this->filter_status_full = filter_status_full; };
       void set_bypass_factor(sensor::Sensor *bypass_factor) { this->bypass_factor = bypass_factor; };
       void set_bypass_step(sensor::Sensor *bypass_step) { this->bypass_step = bypass_step; };
       void set_bypass_correction(sensor::Sensor *bypass_correction) { this->bypass_correction = bypass_correction; };

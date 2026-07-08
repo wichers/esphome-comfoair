@@ -44,6 +44,7 @@ CONF_RETURN_AIR_LEVEL = "return_air_level"
 CONF_SUPPLY_AIR_LEVEL = "supply_air_level"
 CONF_SUPPLY_FAN_ACTIVE = "supply_fan_active"
 CONF_FILTER_STATUS = "filter_status"
+CONF_FILTER_STATUS_FULL = "filter_status_full"
 CONF_BYPASS_PRESENT = "bypass_present"
 CONF_ENTHALPY_PRESENT = "enthalpy_present"
 CONF_EWT_PRESENT = "ewt_present"
@@ -169,6 +170,7 @@ helper_comfoair = {
         CONF_SUMMER_MODE,
         CONF_SUPPLY_FAN_ACTIVE,
         CONF_FROST_PROTECTION_ACTIVE,
+        CONF_FILTER_STATUS_FULL,
 
         CONF_P10_ACTIVE,
         CONF_P11_ACTIVE,
@@ -479,6 +481,9 @@ comfoair_sensors_schemas = cv.Schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
         cv.Optional(CONF_BYPASS_VALVE_OPEN): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_FILTER_STATUS_FULL): binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
         cv.Optional(CONF_PREHEATING_STATE): binary_sensor.binary_sensor_schema(
