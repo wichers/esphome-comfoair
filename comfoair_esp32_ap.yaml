@@ -130,6 +130,8 @@ comfoair:
     name: "Bypass open"
   preheating_state:
     name: "Preheating state"
+  preheating_active:
+    name: "preheating_active"
   outside_air_temperature:
     name: "Outside temperature"
   supply_air_temperature:

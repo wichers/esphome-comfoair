@@ -45,6 +45,8 @@ comfoair:
     name: "bypass_valve_open"
   preheating_state:
     name: "preheating_state"
+  preheating_active:
+    name: "preheating_active"
   outside_air_temperature:
     name: "outside_air_temperature"
   supply_air_temperature:
