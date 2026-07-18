@@ -32,6 +32,7 @@ CONF_INTAKE_FAN_SPEED_RPM = "intake_fan_speed_rpm"
 CONF_EXHAUST_FAN_SPEED_RPM = "exhaust_fan_speed_rpm"
 CONF_VENTILATION_LEVEL = "ventilation_level"
 CONF_PREHEATING_STATE = "preheating_state"
+CONF_PREHEATING_ACTIVE = "preheating_active"
 CONF_OUTSIDE_AIR_TEMPERATURE = "outside_air_temperature"
 CONF_SUPPLY_AIR_TEMPERATURE = "supply_air_temperature"
 CONF_RETURN_AIR_TEMPERATURE = "return_air_temperature"
@@ -167,6 +168,7 @@ helper_comfoair = {
         CONF_PREHEATING_PRESENT,
         CONF_BYPASS_VALVE_OPEN,
         CONF_PREHEATING_STATE,
+        CONF_PREHEATING_ACTIVE,
         CONF_SUMMER_MODE,
         CONF_SUPPLY_FAN_ACTIVE,
         CONF_FROST_PROTECTION_ACTIVE,
@@ -487,6 +489,9 @@ comfoair_sensors_schemas = cv.Schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
         cv.Optional(CONF_PREHEATING_STATE): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_EMPTY
+        ).extend(),
+        cv.Optional(CONF_PREHEATING_ACTIVE): binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
         cv.Optional(CONF_SUMMER_MODE): binary_sensor.binary_sensor_schema(

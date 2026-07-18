@@ -494,9 +494,10 @@ namespace esphome
           {
             bypass_valve_open->publish_state(msg[0] != 0);
           }
-          if (preheating_state != nullptr)
+          // Value 2 means unknown; do not publish it as a false closed state.
+          if (preheating_state != nullptr && msg[1] <= 1)
           {
-            preheating_state->publish_state(msg[1] != 0);
+            preheating_state->publish_state(msg[1] == 1);
           }
           if (motor_current_bypass != nullptr)
           {
@@ -921,9 +922,9 @@ namespace esphome
             frost_protection_active->publish_state(msg[1] != 0);
           }
 
-          if (preheating_state != nullptr)
+          if (preheating_active != nullptr && msg[2] <= 1)
           {
-            preheating_state->publish_state(msg[2] != 0);
+            preheating_active->publish_state(msg[2] == 1);
           }
 
           if (frost_protection_minutes != nullptr)
@@ -1180,6 +1181,7 @@ namespace esphome
       binary_sensor::BinarySensor *postheating_pwm_mode_present{nullptr};
       binary_sensor::BinarySensor *bypass_valve_open{nullptr};
       binary_sensor::BinarySensor *preheating_state{nullptr};
+      binary_sensor::BinarySensor *preheating_active{nullptr};
       binary_sensor::BinarySensor *summer_mode{nullptr};
       binary_sensor::BinarySensor *supply_fan_active{nullptr};
       binary_sensor::BinarySensor *p10_active{nullptr};
@@ -1245,6 +1247,7 @@ namespace esphome
       void set_postheating_pwm_mode_present(binary_sensor::BinarySensor *postheating_pwm_mode_present) { this->postheating_pwm_mode_present = postheating_pwm_mode_present; };
       void set_bypass_valve_open(binary_sensor::BinarySensor *bypass_valve_open) { this->bypass_valve_open = bypass_valve_open; };
       void set_preheating_state(binary_sensor::BinarySensor *preheating_state) { this->preheating_state = preheating_state; };
+      void set_preheating_active(binary_sensor::BinarySensor *preheating_active) { this->preheating_active = preheating_active; };
       void set_outside_air_temperature(sensor::Sensor *outside_air_temperature) { this->outside_air_temperature = outside_air_temperature; };
       void set_supply_air_temperature(sensor::Sensor *supply_air_temperature) { this->supply_air_temperature = supply_air_temperature; };
       void set_return_air_temperature(sensor::Sensor *return_air_temperature) { this->return_air_temperature = return_air_temperature; };
