@@ -43,8 +43,10 @@ comfoair:
     name: "bypass_valve"
   bypass_valve_open:
     name: "bypass_valve_open"
+  # Valve position: ON only when the preheating valve is open.
   preheating_state:
     name: "preheating_state"
+  # Heating activity: ON while preheating is active.
   preheating_active:
     name: "preheating_active"
   outside_air_temperature:

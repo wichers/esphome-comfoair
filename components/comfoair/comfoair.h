@@ -494,7 +494,8 @@ namespace esphome
           {
             bypass_valve_open->publish_state(msg[0] != 0);
           }
-          if (preheating_state != nullptr)
+          // Value 2 means unknown; do not publish it as a false closed state.
+          if (preheating_state != nullptr && msg[1] <= 1)
           {
             preheating_state->publish_state(msg[1] == 1);
           }
@@ -916,9 +917,9 @@ namespace esphome
             frost_protection_active->publish_state(msg[1] != 0);
           }
 
-          if (preheating_active != nullptr)
+          if (preheating_active != nullptr && msg[2] <= 1)
           {
-            preheating_active->publish_state(msg[2] != 0);
+            preheating_active->publish_state(msg[2] == 1);
           }
 
           if (frost_protection_minutes != nullptr)
