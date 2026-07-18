@@ -644,14 +644,13 @@ comfoair_sensors_schemas = cv.Schema(
 )
 
 CONFIG_SCHEMA = (
-  climate.climate_schema(ComfoAirComponent)
-  .extend(
-    {
-      cv.Required(REQUIRED_KEY_NAME): cv.string,
-    }
-  )
-  .extend(uart.UART_DEVICE_SCHEMA)
-  .extend(comfoair_sensors_schemas)
+    climate.climate_schema(ComfoAirComponent).extend(
+        {
+            cv.Required(REQUIRED_KEY_NAME): cv.string,
+        }
+    )
+    .extend(uart.UART_DEVICE_SCHEMA)
+    .extend(comfoair_sensors_schemas)
 )
 
 def to_code(config):

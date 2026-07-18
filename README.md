@@ -1,6 +1,14 @@
 # ComfoAir
 Port of the ComfoAir protocol to ESPHome.io firmware, which is supported by external_components.
 
+The component sends one protocol request every two seconds. After the initial
+version/status requests, the regular ten-request sensor cycle completes roughly
+every 20 seconds.
+
+Ready-to-adapt MQTT/web-server examples are included for `esp32-s3-devkitc-1`
+and `wemos_d1_mini32` boards. They intentionally leave the Home Assistant
+native API disabled.
+
 Add the following definition of `external_components` to your yaml configuration:
 
 ```

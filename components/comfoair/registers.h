@@ -5,14 +5,17 @@
 // =================================================
 
 #define COMMAND_PREFIX 0x07
-#define COMMAND_HEAD 0xF0
+#define COMMAND_HEAD_CMD 0xF0 // previously COMMAND_HEAD
+#define COMMAND_HEAD_ACK 0xF3 // previously COMMAND_ACK
 #define COMMAND_LEN_HEAD 5
 #define COMMAND_TAIL 0x0F
 #define COMMAND_LEN_TAIL 3
-#define COMMAND_ACK 0xF3
-#define COMMAND_ID_ACK 1
-#define COMMAND_IDX_DATA 4
+#define COMMAND_IDX_PREFIX 0          // new define
+#define COMMAND_IDX_HEAD 1            // previously COMMAND_ID_ACK
+#define COMMAND_IDX_EXTENDED_MSG_ID 2 // new define
 #define COMMAND_IDX_MSG_ID 3
+#define COMMAND_IDX_PROTOCOL_LENGTH 4    // previously COMMAND_IDX_DATA
+#define COMMAND_IDX_PROTOCOL_DATA_AREA 5 // new define
 
 // =================================================
 // ========== Bootloader (PC an ComfoAir) ==========
@@ -82,8 +85,8 @@ Byte[1] = Version Minor
 Byte[2] = Beta
 Byte[3-12] = Devicename (ASCII String)
 */
-#define CMD_GET_BOOTLOADER_VERSION 0x67
-#define RES_GET_BOOTLOADER_VERSION 0x68
+#define CMD_GET_BOOTLOADER_VERSION 0x67 // update case -4
+#define RES_GET_BOOTLOADER_VERSION 0x68 // implemented
 
 /*
 Data: -
@@ -94,8 +97,8 @@ Byte[1] = Version Minor
 Byte[2] = Beta
 Byte[3-12] = Devicename (ASCII String)
 */
-#define CMD_GET_FIRMWARE_VERSION 0x69
-#define RES_GET_FIRMWARE_VERSION 0x6A
+#define CMD_GET_FIRMWARE_VERSION 0x69 // update case -3
+#define RES_GET_FIRMWARE_VERSION 0x6A // implemented
 
 /*
 Data: -
@@ -111,8 +114,8 @@ Byte[13] = Version CC-Luxe
     Bit[7..4] Version Major
     Bit[3..0] = Version Minor
 */
-#define CMD_GET_CONNECTOR_BOARD_VERSION 0xA1
-#define RES_GET_CONNECTOR_BOARD_VERSION 0xA2
+#define CMD_GET_CONNECTOR_BOARD_VERSION 0xA1 // update case -2
+#define RES_GET_CONNECTOR_BOARD_VERSION 0xA2 // implemented
 
 /*
 Data: 1 byte
@@ -129,7 +132,7 @@ Byte[0] = 0x00 = Without connection
           0x04 = PC log mode
 */
 #define CMD_SET_RS232_MODE 0x9B
-#define RES_SET_RS232_MODE 0x9C
+#define RES_SET_RS232_MODE 0x9C // todo missing
 
 // ======================================================================
 // ========== Command list (PC to ComfoAir) / reading commands ==========
@@ -149,8 +152,8 @@ Byte[1] = Switching inputs: (1 = active / 0 = inactive)
     0x08 = heat recovery (WTW)
     0x10 = bathroom switch 2 (luxe)
 */
-#define CMD_GET_INPUTS 0x03
-#define RES_GET_INPUTS 0x04
+#define CMD_GET_INPUTS 0x03 // todo missing
+#define RES_GET_INPUTS 0x04 // todo missing
 
 /*
 Data: -
@@ -161,8 +164,8 @@ Byte[1] = Exhaust air (%)
 Byte[2..3] = Supply air fan speed (rpm**)
 Byte[4..5] = Exhaust air fan speed (rpm**)
 */
-#define CMD_GET_FAN_STATUS 0x0B
-#define RES_GET_FAN_STATUS 0x0C
+#define CMD_GET_FAN_STATUS 0x0B // update case 0
+#define RES_GET_FAN_STATUS 0x0C // implemented
 
 /*
 Data: -
@@ -173,8 +176,8 @@ Byte[1] = Preheating (1 = Open / 0 = Closed / 2 = Unknown)
 Byte[2] = Bypass motor current (ADC raw data)
 Byte[3] = Preheating motor current (ADC raw data)
 */
-#define CMD_GET_VALVE_STATUS 0x0D
-#define RES_GET_VALVE_STATUS 0x0E
+#define CMD_GET_VALVE_STATUS 0x0D // update case 1
+#define RES_GET_VALVE_STATUS 0x0E // implemented
 
 /*
 Data: -
@@ -185,8 +188,8 @@ Byte[1] = T2 / supply air (°C*)
 Byte[2] = T3 / exhaust air (in) (°C*)
 Byte[3] = T4 / exhaust air (out) (°C*)
 */
-#define CMD_GET_TEMPERATURE_STATUS 0x0F
-#define RES_GET_TEMPERATURE_STATUS 0x10
+#define CMD_GET_TEMPERATURE_STATUS 0x0F // implemented
+#define RES_GET_TEMPERATURE_STATUS 0x10 // implemented
 
 /*
 Data: -
@@ -195,8 +198,8 @@ Response: 1 byte
 Byte[0] = 0x00 = Nothing pressed
           0xFF = Error
 */
-#define CMD_GET_BUTTON_STATUS 0x11
-#define RES_GET_BUTTON_STATUS 0x12
+#define CMD_GET_BUTTON_STATUS 0x11 // todo missing
+#define RES_GET_BUTTON_STATUS 0x12 // todo missing
 
 /*
 Data: -
@@ -207,8 +210,8 @@ Byte[1] = Analog 2 (0..255 = 0..10V)
 Byte[2] = Analog 3 (0..255 = 0..10V)
 Byte[3] = Analog 4 (0..255 = 0..10V)
 */
-#define CMD_GET_ANALOG_INPUTS 0x13
-#define RES_GET_ANALOG_INPUTS 0x14
+#define CMD_GET_ANALOG_INPUTS 0x13 // todo missing
+#define RES_GET_ANALOG_INPUTS 0x14 // todo missing
 
 /*
 Data: -
@@ -232,8 +235,8 @@ Byte[14] = Analog 3 from desired (%)
 Byte[15] = Analog 4 to desired (%)
 Byte[16] = Analog 4 from desired (%)
 */
-#define CMD_GET_SENSOR_DATA 0x97
-#define RES_GET_SENSOR_DATA 0x98
+#define CMD_GET_SENSOR_DATA 0x97 // implemented
+#define RES_GET_SENSOR_DATA 0x98 // implemented
 
 /*
 Data: -
@@ -274,8 +277,8 @@ Byte[16] = Analog RF Max Setting (%)
 Byte[17] = Analog RF setpoint (%)
 Byte[18] = Priority control (0 = analog inputs / 1 = weekly program)
 */
-#define CMD_GET_ANALOG_VALUES 0x9D
-#define RES_GET_ANALOG_VALUES 0x9E
+#define CMD_GET_ANALOG_VALUES 0x9D // todo missing
+#define RES_GET_ANALOG_VALUES 0x9E // todo missing
 
 /*
 Data: -
@@ -290,8 +293,8 @@ Byte[5] = RF high time short (min)
 Byte[6] = RF high time long (min)
 Byte[7] = Kitchen hood switch-off delay (min)
 */
-#define CMD_GET_TIME_DELAY 0xC9
-#define RES_GET_TIME_DELAY 0xCA
+#define CMD_GET_TIME_DELAY 0xC9 // update case 9
+#define RES_GET_TIME_DELAY 0xCA // implemented
 
 /*
 Data: -
@@ -312,8 +315,8 @@ Byte[11] = Supply air high / level 3 (%)
 Byte[12] = ..
 Byte[13] = ..
 */
-#define CMD_GET_VENTILATION_LEVEL 0xCD
-#define RES_GET_VENTILATION_LEVEL 0xCE
+#define CMD_GET_VENTILATION_LEVEL 0xCD // update case 3
+#define RES_GET_VENTILATION_LEVEL 0xCE // implemented
 
 /*
 Data: -
@@ -336,8 +339,8 @@ Byte[6] = Temperature EWT (°C*)
 Byte[7] = Temperature afterheating (°C*)
 Byte[8] = Temperature kitchen hood (°C*)
 */
-#define CMD_GET_TEMPERATURES 0xD1
-#define RES_GET_TEMPERATURES 0xD2
+#define CMD_GET_TEMPERATURES 0xD1 // update case 4
+#define RES_GET_TEMPERATURES 0xD2 // implemented
 
 /*
 Data: -
@@ -369,8 +372,8 @@ Byte[9] = Enthalpy present (1 = present / 0 = absent / 2 = without Sensor)
 Byte[10] = EWT present (1 = regulated / 0 = absent / 2 = unregulated)
 
 */
-#define CMD_GET_STATUS 0xD5
-#define RES_GET_STATUS 0xD6
+#define CMD_GET_STATUS 0xD5 // update case -1
+#define RES_GET_STATUS 0xD6 // implemented
 
 /*
 Data: -
@@ -447,8 +450,8 @@ Byte[16] = Last but one error A (high):
     0x40 = A15
     0x80 = A0
 */
-#define CMD_GET_FAULTS 0xD9
-#define RES_GET_FAULTS 0xDA
+#define CMD_GET_FAULTS 0xD9 // update case 5
+#define RES_GET_FAULTS 0xDA // implemented
 
 /*
 Data: -
@@ -463,8 +466,8 @@ Bytes[13-14] = Operating hours bypass open (h) (Byte[14] = Low Byte)
 Bytes[15-16] = Filter operating hours (h) (Byte[16] = Low Byte)
 Bytes[17-19] = Operating hours high / level 3 (h) (Byte[19] = Low Byte)
 */
-#define CMD_GET_OPERATION_HOURS 0xDD
-#define RES_GET_OPERATION_HOURS 0xDE
+#define CMD_GET_OPERATION_HOURS 0xDD // update case 7
+#define RES_GET_OPERATION_HOURS 0xDE // implemented
 
 /*
 Data: -
@@ -478,8 +481,8 @@ Byte[4] = Bypass correction
 Byte[5] = 0x00
 Byte[6] = Summer mode (1 = yes / 0 = no (winter))
 */
-#define CMD_GET_BYPASS_CONTROL_STATUS 0xDF
-#define RES_GET_BYPASS_CONTROL_STATUS 0xE0
+#define CMD_GET_BYPASS_CONTROL_STATUS 0xDF // update case 6
+#define RES_GET_BYPASS_CONTROL_STATUS 0xE0 // implemented
 
 /*
 Data: -
@@ -491,8 +494,8 @@ Byte[2] = Preheating (1 = active / 0 = inactive)
 Byte[3..4] = Frost minutes (min)
 Byte[5] = Frost protection (1 = extra safe / 4 = safe)
 */
-#define CMD_GET_PREHEATING_STATUS 0xE1
-#define RES_GET_PREHEATING_STATUS 0xE2
+#define CMD_GET_PREHEATING_STATUS 0xE1 // update case 8
+#define RES_GET_PREHEATING_STATUS 0xE2 // implemented
 
 /*
 Data: -
@@ -506,8 +509,8 @@ Byte[4] = RF ID
 Byte[5] = Module present
 Byte[6] = Self-learning mode active
 */
-#define CMD_GET_RF_STATUS 0xE5
-#define RES_GET_RF_STATUS 0xE6
+#define CMD_GET_RF_STATUS 0xE5 // todo missing
+#define RES_GET_RF_STATUS 0xE6 // todo missing
 
 /*
 Data: -
@@ -522,8 +525,8 @@ Byte[5] =
 Byte[6] =
 Byte[7] = Latest value (°C)
 */
-#define CMD_GET_LAST_8_TIMES_PREHEATING 0xE9
-#define RES_GET_LAST_8_TIMES_PREHEATING 0xEA
+#define CMD_GET_LAST_8_TIMES_PREHEATING 0xE9 // todo missing
+#define RES_GET_LAST_8_TIMES_PREHEATING 0xEA // todo missing
 
 /*
 Data: -
@@ -537,8 +540,8 @@ Byte[4] = Post-heating performance
 Byte[5] = Post-heating power I parameter
 Byte[6] = Reheating T desired (°C)
 */
-#define CMD_EWT_POST_HEATING 0xEB
-#define RES_EWT_POST_HEATING 0xEC
+#define CMD_EWT_POST_HEATING 0xEB // todo missing
+#define RES_EWT_POST_HEATING 0xEC // todo missing
 
 // ====================================================================
 // ========== Command list (PC to ComfoAir) / write commands ==========
@@ -554,8 +557,9 @@ Byte[0] = 0x00 = Auto
 
 Response: ACK
 */
-#define CMD_SET_LEVEL 0x99
-#define RES_SET_LEVEL COMMAND_ACK
+#define CMD_SET_LEVEL 0x99 // implemented
+#define CMD_SET_LEVEL_LENGTH 1
+#define RES_SET_LEVEL COMMAND_HEAD_ACK
 
 /*
 Data: 19 bytes
@@ -596,8 +600,8 @@ Byte[18] = Priority control (0 = analog inputs / 1 = weekly program)
 
 Response: ACK
 */
-#define CMD_SET_ANALOG_VALUES 0x9F
-#define RES_SET_ANALOG_VALUES COMMAND_ACK
+#define CMD_SET_ANALOG_VALUES 0x9F // todo missing
+#define RES_SET_ANALOG_VALUES COMMAND_HEAD_ACK
 
 /*
 Data: 8 bytes
@@ -612,8 +616,8 @@ Byte[7] = Kitchen hood switch-off delay (min)
 
 Response: ACK
 */
-#define CMD_SET_TIME_DELAY 0xCB
-#define RES_SET_TIME_DELAY COMMAND_ACK
+#define CMD_SET_TIME_DELAY 0xCB // todo missing
+#define RES_SET_TIME_DELAY COMMAND_HEAD_ACK
 
 /*
 Data: 9 bytes
@@ -629,8 +633,9 @@ Byte[8] =
 
 Response: ACK
 */
-#define CMD_SET_VENTILATION_LEVEL 0xCF
-#define RES_SET_VENTILATION_LEVEL COMMAND_ACK
+#define CMD_SET_VENTILATION_LEVEL 0xCF // todo missing
+#define CMD_SET_VENTILATION_LEVEL_LENGTH 9
+#define RES_SET_VENTILATION_LEVEL COMMAND_HEAD_ACK
 
 /*
 Data: 1 byte
@@ -638,8 +643,9 @@ Byte[0] = Comfort temperature (°C*)
 
 Response: ACK
 */
-#define CMD_SET_COMFORT_TEMPERATURE 0xD3
-#define RES_SET_COMFORT_TEMPERATURE COMMAND_ACK
+#define CMD_SET_COMFORT_TEMPERATURE 0xD3 // implemented
+#define CMD_SET_COMFORT_TEMPERATURE_LENGTH 1
+#define RES_SET_COMFORT_TEMPERATURE COMMAND_HEAD_ACK
 
 /*
 Data: 8 bytes
@@ -659,8 +665,8 @@ Byte[7] = EWT present (1 = regulated / 0 = absent / 2 = unregulated)
 
 Response: ACK
 */
-#define CMD_SET_STATUS 0xD7
-#define RES_SET_STATUS COMMAND_ACK
+#define CMD_SET_STATUS 0xD7 // todo missing
+#define RES_SET_STATUS COMMAND_HEAD_ACK
 
 /*
 Data: 4 bytes
@@ -671,8 +677,9 @@ Byte[3] = Reset filter operating hours (1 = reset / 0 = -)
 
 Response: ACK
 */
-#define CMD_RESET_AND_SELF_TEST 0xDB
-#define RES_RESET_AND_SELF_TEST COMMAND_ACK
+#define CMD_RESET_AND_SELF_TEST 0xDB // implemented
+#define CMD_RESET_AND_SELF_TEST_LENGTH 4
+#define RES_RESET_AND_SELF_TEST COMMAND_HEAD_ACK
 
 /*
 Data: 5 bytes
@@ -687,8 +694,8 @@ Byte[4] = Reheating T desired (°C)
 
 Response: ACK
 */
-#define CMD_SET_EWT_POSTHEATING 0xED
-#define RES_SET_EWT_POSTHEATING COMMAND_ACK
+#define CMD_SET_EWT_POSTHEATING 0xED // todo missing
+#define RES_SET_EWT_POSTHEATING COMMAND_HEAD_ACK
 
 // ================================================
 // ========== Test mode (PC to ComfoAir) ==========
@@ -700,8 +707,8 @@ Data: -
 Response: -
 Confirmation test mode
 */
-#define CMD_SET_TEST_MODE 0x01
-#define RES_SET_TEST_MODE 0x02
+#define CMD_SET_TEST_MODE 0x01 // todo missing
+#define RES_SET_TEST_MODE 0x02 // todo missing
 
 /*
 Data: 2 bytes
@@ -717,8 +724,8 @@ Byte[1] = Return message
 
 Response: -
 */
-#define CMD_SET_OUTPUTS 0x05
-#define RES_SET_OUTPUTS []
+#define CMD_SET_OUTPUTS 0x05 // todo missing
+#define RES_SET_OUTPUTS []   // todo missing
 
 /*
 Data: 3 bytes
@@ -728,8 +735,8 @@ Byte[2] = Post-heating (%)
 
 Response: -
 */
-#define CMD_SET_ANALOG_OUTPUTS 0x07
-#define RES_SET_ANALOG_OUTPUTS []
+#define CMD_SET_ANALOG_OUTPUTS 0x07 // todo missing
+#define RES_SET_ANALOG_OUTPUTS []   // todo missing
 
 /*
 Data: 2 bytes
@@ -738,8 +745,8 @@ Byte[1] = Preheating (1 = open / 0 = closed / 3 = stop)
 
 Response:
 */
-#define CMD_SET_FLAPS 0x09
-#define RES_SET_FLAPS []
+#define CMD_SET_FLAPS 0x09 // todo missing
+#define RES_SET_FLAPS []   // todo missing
 
 /*
 Data: -
@@ -747,8 +754,8 @@ Data: -
 Response: -
 Confirmation end of test mode
 */
-#define CMD_EXIT_TEST_MODE 0x19
-#define RES_EXIT_TEST_MODE 0x1A
+#define CMD_EXIT_TEST_MODE 0x19 // todo missing
+#define RES_EXIT_TEST_MODE 0x1A // todo missing
 
 // ========================================================
 // ========== Command list (CC-Ease to ComfoAir) ==========
@@ -761,18 +768,18 @@ Response: -
 
 See ComfoAir command list on CC-Ease
 */
-#define CMD_GET_DATA 0x33
-#define RES_GET_DATA_1 0x38
-#define RES_GET_DATA_2 0x3E
-#define RES_GET_DATA_3 0x40
-#define RES_GET_DATA_4 0x98
-#define RES_GET_DATA_5 0x9C
-#define RES_GET_DATA_6 0xAA
-#define RES_GET_DATA_7 0xCE
-#define RES_GET_DATA_8 0xD2
-#define RES_GET_DATA_9 0xE0
-#define RES_GET_DATA_10 0xE2
-#define RES_GET_DATA_11 0xEC
+#define CMD_GET_DATA 0x33    // todo missing
+#define RES_GET_DATA_1 0x38  // todo missing
+#define RES_GET_DATA_2 0x3E  // todo missing
+#define RES_GET_DATA_3 0x40  // todo missing
+#define RES_GET_DATA_4 0x98  // todo missing
+#define RES_GET_DATA_5 0x9C  // todo missing
+#define RES_GET_DATA_6 0xAA  // todo missing
+#define RES_GET_DATA_7 0xCE  // todo missing
+#define RES_GET_DATA_8 0xD2  // todo missing
+#define RES_GET_DATA_9 0xE0  // todo missing
+#define RES_GET_DATA_10 0xE2 // todo missing
+#define RES_GET_DATA_11 0xEC // todo missing
 
 /*
 Data: 5 bytes
@@ -797,8 +804,8 @@ Response: -
 See ComfoAir command list on CC-Ease
 
 */
-#define CMD_GET_CC_EASE_PARAMETERS 0x35
-#define RES_GET_CC_EASE_PARAMETERS 0x3C
+#define CMD_GET_CC_EASE_PARAMETERS 0x35 // todo missing
+#define RES_GET_CC_EASE_PARAMETERS 0x3C // todo missing
 
 /*
 Data: 7 bytes
@@ -814,8 +821,8 @@ Byte[6] Status bits
 Response: -
 See ComfoAir command list on CC-Ease
 */
-#define CMD_CCEASE_BUTTON_STATUS 0x37
-#define RES_CCEASE_BUTTON_STATUS 0x3C
+#define CMD_CCEASE_BUTTON_STATUS 0x37 // todo missing
+#define RES_CCEASE_BUTTON_STATUS 0x3C // todo missing
 
 /*
 Data: 16 bytes
@@ -839,8 +846,8 @@ Byte[15] = Data byte 10
 Response: -
 See ComfoAir command list on CC-Ease
 */
-#define CMD_GET_RF_COMMAND 0x39
-#define RES_GET_RF_COMMAND 0x40
+#define CMD_GET_RF_COMMAND 0x39 // todo missing
+#define RES_GET_RF_COMMAND 0x40 // todo missing
 
 // ========================================================
 // ========== Command list (ComfoAir to CC-Ease) ==========
@@ -863,8 +870,8 @@ Byte[4] = Backlight (fixed at 100%)
 
 Response:
 */
-#define CMD_SET_PARAMETER 0x38
-#define RES_SET_PARAMETER []
+#define CMD_SET_PARAMETER 0x38 // todo missing
+#define RES_SET_PARAMETER []   // todo missing
 
 /*
 Data: 10 bytes
@@ -961,8 +968,9 @@ Byte[9] = (1 = on / 0 = off)
 
 Response: -
 */
-#define CMD_SET_DISPLAY 0x39
-#define RES_SET_DISPLAY []
+#define CMD_SET_DISPLAY                                                                                                \
+  0x39                     // todo missing // todo this differs from Protokollbeschreibung_ComfoAir.pdf which says 0x3C
+#define RES_SET_DISPLAY [] // todo missing
 
 /*
 Data: 4 bytes
@@ -973,8 +981,8 @@ Byte[3] = RF Address 1 (High Byte)
 
 Response: -
 */
-#define CMD_SET_RF_ADDRESS 0x3E
-#define RES_SET_RF_ADDRESS []
+#define CMD_SET_RF_ADDRESS 0x3E // todo missing
+#define RES_SET_RF_ADDRESS []   // todo missing
 
 /*
 Data: 21 bytes
@@ -1005,5 +1013,5 @@ Byte[20] = Control bits
 
 Response:
 */
-#define CMD_SEND_RF_COMMAND 0x40
-#define RES_SEND_RF_COMMAND []
+#define CMD_SEND_RF_COMMAND 0x40 // todo missing
+#define RES_SEND_RF_COMMAND []   // todo missing

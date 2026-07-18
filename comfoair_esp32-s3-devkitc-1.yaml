@@ -1,0 +1,623 @@
+# ### Substitutions ###
+# <https://esphome.io/components/substitutions>
+substitutions:
+  node_name: comfoair # [a-z][0-9][_] max 24 characters, unique name per network!
+  device_name: "Zehnder ComfoAir 350"
+  node_comment: "ESPhome controller for ComfoAir 350" # Additional text information about this node. Only for display in UI.
+  ota_password: !secret comfoair_ota_password
+
+# ### Core configuration ###
+# <https://esphome.io/components/esphome>
+esphome:
+  name: ${node_name}
+  friendly_name: "${device_name}"
+  comment: ${node_comment}
+  area: lab #livingroom
+  project:
+    name: "wichers.comfoair" # author_name.project_name
+    version: "1.1.0"
+  # debug_scheduler: false
+  on_boot:
+    # default to red LED when connecting
+    - light.turn_on:
+        id: status_light
+        brightness: 20%
+        red: 100%
+        green: 0%
+        blue: 0%
+  # on_loop:
+
+# ### Supported Microcontrollers ###
+# <https://esphome.io/components/esp32>
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 4MB
+  variant: esp32s3
+  framework:
+    type: esp-idf
+
+psram:
+  mode: quad
+  speed: 80MHz
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: status_light
+    chipset: WS2812
+    pin: GPIO21 # GPIO48
+    num_leds: 1
+    rgb_order: GRB
+    name: "WS2812B Light"
+    restore_mode: ALWAYS_ON
+
+# ----- software & libraries -----
+
+# ----- external_components -----
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/wichers/esphome-comfoair
+    components: [comfoair]
+
+# ----- Communication connections (wifi, webserver, HomeAssistent-api, mqtt) -----
+
+# ### Network Hardware ###
+# <https://esphome.io/components/wifi>
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Enable fallback hotspot in case wifi connection fails
+  ap:
+    ssid: ${node_name}-setup
+    password: !secret wifi_fallback_ap_key
+  # reboot_timeout: 0s
+  # power_save_mode: none # NONE (least power saving, Default for ESP8266), LIGHT (Default for ESP32), HIGH (most power saving)
+  on_connect:
+    - light.turn_on:
+        id: status_light
+        brightness: 20%
+        red: 0%
+        green: 100%
+        blue: 0%
+  on_disconnect:
+    - light.turn_on:
+        id: status_light
+        brightness: 20%
+        red: 0%
+        green: 50%
+        blue: 50%
+
+# ### Captive Portal ###
+# Enable captive portal on fallback hotspot (in case wifi connection fails)
+# <https://esphome.io/components/captive_portal>
+captive_portal:
+
+# ### Management and Monitoring ###
+# <https://esphome.io/components/web_server>
+web_server:
+  port: 80
+  ota: false
+  local: true
+  version: 3
+  # auth:
+  #   username: !secret web_server_username
+  #   password: !secret web_server_password
+  sorting_groups:
+    - id: sorting_group_temperatures
+      name: "Comfo Actual Temperatures"
+      sorting_weight: 10 # lower value gets sorted above higher. default value is 50
+    - id: sorting_group_bypass
+      name: "Comfo Bypass"
+      sorting_weight: 20
+    - id: sorting_group_fan
+      name: "Comfo Fans"
+      sorting_weight: 30
+    - id: sorting_group_filter
+      name: "Comfo Filter"
+      sorting_weight: 40
+    - id: sorting_group_configuration
+      name: "Comfo Configuration"
+      sorting_weight: 50
+    - id: sorting_group_setup
+      name: "Comfo Parameter Setup"
+      sorting_weight: 60
+    - id: sorting_group_statistics
+      name: "Comfo Statistics"
+      sorting_weight: 70
+    - id: sorting_group_Frost_Heat
+      name: "Comfo Heating and Frost Protection"
+      sorting_weight: 80
+    - id: sorting_group_settings
+      name: "Comfo Parameter Settings"
+      sorting_weight: 90
+    - id: sorting_group_features_present
+      name: "Comfo Features Present"
+      sorting_weight: 100
+
+# ### Native API Component ### (Home Assistant API)
+# <https://esphome.io/components/api>
+# api:
+#   encryption:
+#     key: !secret comfoair_api_encryption_key
+#   reboot_timeout: 0s # disable reboot (0s), default: 15min
+#   custom_services: true
+
+# ### MQTT Client Component ###
+# <https://esphome.io/components/mqtt>
+mqtt:
+  broker: !secret mqtt_host
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  port: 1883
+  # clean_session: false # default
+  # discover_ip: false
+  # discovery: false
+  # discovery_retain: false
+  # reboot_timeout: 0s
+  # topic_prefix:
+  # log_topic:
+
+# Programming and debugging
+
+# ### Logger Component ###
+# <https://esphome.io/components/logger>
+logger:
+  # baud_rate: 115200 # serial UART baud_rate. 0 = disable logging via UART
+  level: VERY_VERBOSE # VERY_VERBOSE, VERBOSE, DEBUG, INFO, WARN, ERROR, NONE
+  initial_level: INFO
+
+# ### Over-the-Air Updates ###
+# <https://esphome.io/components/ota/>
+ota:
+  - platform: esphome # <https://esphome.io/components/ota/esphome>
+    password: ${ota_password}
+    on_begin:
+      then:
+        # Turn the LED Red when OTA Updating
+        - light.turn_on:
+            id: status_light
+            brightness: 40%
+            red: 40%
+            green: 0%
+            blue: 0%
+            transition_length: 0s
+        - lambda: "id(status_light).loop();"
+
+# Select
+# Logger Select - Example configuration entry
+# <https://esphome.io/components/select/logger>
+# select select_level:
+# <https://github.com/esphome/feature-requests/issues/3151>
+select:
+  - platform: logger
+    name: "Logger select"
+  - platform: template
+    name: Select Level
+    id: select_level
+    options:
+      - "auto"
+      - "absent"
+      - "low"
+      - "medium"
+      - "high"
+    initial_option: "medium"
+    optimistic: True
+    on_value:
+      then:
+        - lambda: |-
+            switch(i){
+            case 0:
+              id(comfoair_climate).set_level(0);
+              break;
+            case 1:
+              id(comfoair_climate).set_level(1);
+              break;
+            case 2:
+              id(comfoair_climate).set_level(2);
+              break;
+            case 3:
+              id(comfoair_climate).set_level(3);
+              break;
+            case 4:
+              id(comfoair_climate).set_level(4);
+              break;
+            default:
+              id(comfoair_climate).set_level(1);
+            }
+
+# sensors / inputs / outputs
+
+# http_request:
+
+# output:
+#   - platform: gpio
+#     id: orange_led_out
+#     pin: GPIO18
+#   - platform: gpio
+#     id: green_led_out
+#     pin: GPIO19
+
+# interval:
+#   - interval: 1s
+#     then:
+#       if:
+#         condition:
+#           wifi.connected:
+#         then:
+#           - output.turn_off: green_led_out
+#         else:
+#           - output.turn_on: green_led_out
+#           - delay: 500ms
+#           - output.turn_off: green_led_out
+#   - interval: 500ms
+#     then:
+#       if:
+#         condition:
+#           api.connected:
+#         then:
+#           - output.turn_off: orange_led_out
+#         else:
+#           - if:
+#               condition:
+#                 wifi.connected
+#               then:
+#                 - output.turn_on: orange_led_out
+#                 - delay: 250ms
+#                 - output.turn_off: orange_led_out
+#               else:
+#                 - output.turn_off: orange_led_out
+
+sensor:
+  - platform: uptime
+    name: "Uptime"
+  - platform: wifi_signal
+    name: "WiFi Signal Strength"
+    update_interval: 60s
+
+# binary_sensor:
+
+switch:
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+
+button:
+  - platform: restart
+    id: reset_button
+    name: "Reset ESP32 Comfoair Adapter"
+  - platform: template
+    id: filter_reset_button
+    name: "Reset Filter"
+    web_server:
+      sorting_group_id: sorting_group_filter
+    on_press:
+      then:
+        lambda: "id(comfoair_climate).reset_filters();"
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+    hide_timestamp: true
+
+uart:
+  id: uart_bus
+  baud_rate: 9600
+  tx_pin: GPIO43
+  rx_pin: GPIO44
+
+comfoair:
+  id: comfoair_climate
+  name: "${node_name}"
+  uart_id: uart_bus
+  type:
+    name: "Type" # left
+    web_server:
+      sorting_group_id: sorting_group_setup
+  size:
+    name: "Size" # small
+    web_server:
+      sorting_group_id: sorting_group_setup
+  size_select:
+    name: "Size (unit_size)"
+    web_server:
+      sorting_group_id: sorting_group_setup
+  intake_fan_speed:
+    name: "Fan Supply air level" # %
+    web_server:
+      sorting_group_id: sorting_group_fan
+  exhaust_fan_speed:
+    name: "Fan Return air level" # %
+    web_server:
+      sorting_group_id: sorting_group_fan
+  intake_fan_speed_rpm:
+    name: "Fan Intake fan RPM" # RPM
+    web_server:
+      sorting_group_id: sorting_group_fan
+  exhaust_fan_speed_rpm:
+    name: "Fan Exhaust fan RPM" # RPM
+    web_server:
+      sorting_group_id: sorting_group_fan
+  ventilation_level:
+    name: "Ventilation level" # 0...3
+    web_server:
+      sorting_group_id: sorting_group_fan
+  bypass_present:
+    name: "Bypass present" # yes/no
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  bypass_valve:
+    name: "Bypass valve" # %
+    web_server:
+      sorting_group_id: sorting_group_bypass
+  bypass_valve_open:
+    name: "Bypass open"  # yes/no
+    web_server:
+      sorting_group_id: sorting_group_bypass
+  preheating_state:
+    name: "Preheating state" # ON
+    web_server:
+      sorting_group_id: sorting_group_Frost_Heat
+  preheating_active:
+    name: "Preheating active"
+    web_server:
+      sorting_group_id: sorting_group_Frost_Heat
+  outside_air_temperature:
+    name: "T1 Outside temperature"
+    web_server:
+      sorting_group_id: sorting_group_temperatures
+  supply_air_temperature:
+    name: "T2 Supply temperature"
+    web_server:
+      sorting_group_id: sorting_group_temperatures
+  return_air_temperature:
+    name: "T3 Return temperature"
+    web_server:
+      sorting_group_id: sorting_group_temperatures
+  exhaust_air_temperature:
+    name: "T4 Exhaust temperature"
+    web_server:
+      sorting_group_id: sorting_group_temperatures
+  enthalpy_temperature:
+    name: "Enthalpy temperature"
+    web_server:
+      sorting_group_id: sorting_group_temperatures
+  ewt_temperature:
+    name: "EWT temperature "
+    web_server:
+      sorting_group_id: sorting_group_temperatures
+  reheating_temperature:
+    name: "Reheating temperature"
+    web_server:
+      sorting_group_id: sorting_group_temperatures
+  kitchen_hood_temperature:
+    name: "Kitchen hood temperature"
+    web_server:
+      sorting_group_id: sorting_group_temperatures
+  return_air_level:
+    name: "Fan Return level" # m^3
+    web_server:
+      sorting_group_id: sorting_group_fan
+  supply_air_level:
+    name: "Fan Supply level" # m^3
+    web_server:
+      sorting_group_id: sorting_group_fan
+  supply_fan_active:
+    name: "Fan Supply fan active" # yes/no
+    web_server:
+      sorting_group_id: sorting_group_fan
+  filter_status:
+    name: "Filter status" # Filter ok/Filter voll
+    web_server:
+      sorting_group_id: sorting_group_filter
+  filter_status_full:
+    name: "Filter full"
+    web_server:
+      sorting_group_id: sorting_group_filter
+  enthalpy_present:
+    name: "Enthalpy present" # OFF
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  ewt_present:
+    name: "EWT present" # OFF
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  options_present:
+    name: "Options present" # OFF
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  fireplace_present:
+    name: "fireplace_present" # OFF
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  kitchen_hood_present:
+    name: "kitchen_hood_present" # OFF
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  postheating_present:
+    name: "postheating_present" # OFF
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  postheating_pwm_mode_present:
+    name: "postheating_pwm_mode_present" # OFF
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  preheating_present:
+    name: "Preheating present" # OFF
+    web_server:
+      sorting_group_id: sorting_group_features_present
+  bypass_factor:
+    name: "Bypass factor" # a number?
+    web_server:
+      sorting_group_id: sorting_group_bypass
+  bypass_step:
+    name: "Bypass step" # a number?
+    web_server:
+      sorting_group_id: sorting_group_bypass
+  bypass_correction:
+    name: "Bypass correction" # a number?
+    web_server:
+      sorting_group_id: sorting_group_bypass
+  bypass_open_hours:
+    name: "Bypass open hours" # h
+    web_server:
+      sorting_group_id: sorting_group_statistics
+  preheating_hours:
+    name: "Preheating hours" # 0
+    web_server:
+      sorting_group_id: sorting_group_statistics
+  level0_hours:
+    name: "Level 0 hours"
+    web_server:
+      sorting_group_id: sorting_group_statistics
+  level1_hours:
+    name: "Level 1 hours"
+    web_server:
+      sorting_group_id: sorting_group_statistics
+  level2_hours:
+    name: "Level 2 hours"
+    web_server:
+      sorting_group_id: sorting_group_statistics
+  level3_hours:
+    name: "Level 3 hours"
+    web_server:
+      sorting_group_id: sorting_group_statistics
+  preheating_valve:
+    name: "Preheating valve" # Unknown
+    web_server:
+      sorting_group_id: sorting_group_Frost_Heat
+  frost_protection_active:
+    name: "Frost protection active"
+    web_server:
+      sorting_group_id: sorting_group_Frost_Heat
+  frost_protection_hours:
+    name: "Frost protection hours"
+    web_server:
+      sorting_group_id: sorting_group_statistics
+  frost_protection_minutes:
+    name: "Frost protection minutes"
+    web_server:
+      sorting_group_id: sorting_group_Frost_Heat
+  frost_protection_level:
+    name: "Frost protection level"
+    web_server:
+      sorting_group_id: sorting_group_Frost_Heat
+  filter_hours:
+    name: "Filter hours" # "Betriebsstunden Filter"
+    web_server:
+      sorting_group_id: sorting_group_filter
+  motor_current_bypass:
+    name: "Bypass motor current" # A
+    web_server:
+      sorting_group_id: sorting_group_bypass
+  motor_current_preheating:
+    name: "Motor current preheating" # 0.0
+    web_server:
+      sorting_group_id: sorting_group_Frost_Heat
+  summer_mode:
+    name: "Summer mode"
+    web_server:
+      sorting_group_id: sorting_group_bypass
+  p10_active:
+    name: "P10 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p11_active:
+    name: "P11 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p12_active:
+    name: "P12 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p13_active:
+    name: "P13 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p14_active:
+    name: "P14 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p15_active:
+    name: "P15 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p16_active:
+    name: "P16 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p17_active:
+    name: "P17 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p18_active:
+    name: "P18 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p19_active:
+    name: "P19 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p90_active:
+    name: "P90 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p91_active:
+    name: "P91 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p92_active:
+    name: "P92 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p93_active:
+    name: "P93 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p94_active:
+    name: "P94 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p95_active:
+    name: "P95 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p96_active:
+    name: "P96 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  p97_active:
+    name: "P97 active"
+    web_server:
+      sorting_group_id: sorting_group_settings
+  bathroom_switch_on_delay_minutes:
+    name: "Bathroom switch on delay minutes"
+    web_server:
+      sorting_group_id: sorting_group_configuration
+  bathroom_switch_off_delay_minutes:
+    name: "Bathroom switch off delay minutes"
+    web_server:
+      sorting_group_id: sorting_group_configuration
+  l1_switch_off_delay_minutes:
+    name: "L1 switch off delay minutes"
+    web_server:
+      sorting_group_id: sorting_group_configuration
+  boost_ventilation_minutes:
+    name: "Boost ventilation minutes"
+    web_server:
+      sorting_group_id: sorting_group_configuration
+  filter_warning_weeks:
+    name: "Filter warning weeks" # "Filter Zähler Wochen"
+    web_server:
+      sorting_group_id: sorting_group_filter
+  rf_high_time_short_minutes:
+    name: "RF high time short minutes" # 10
+    web_server:
+      sorting_group_id: sorting_group_configuration
+  rf_high_time_long_minutes:
+    name: "RF high time long minutes" # 30
+    web_server:
+      sorting_group_id: sorting_group_configuration
+  extractor_hood_switch_off_delay_minutes:
+    name: "Extractor hood switch off delay minutes"
+    web_server:
+      sorting_group_id: sorting_group_configuration
