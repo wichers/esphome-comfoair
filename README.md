@@ -1,4 +1,21 @@
 # ComfoAir
+
+## Supported models
+
+This component implements the legacy ComfoAir serial protocol.
+
+| Models | Status | Protocol and support |
+| --- | --- | --- |
+| Zehnder WHR 930, WHR 950 | Compatible | ComfoAir serial protocol |
+| Zehnder ComfoAir 160, 200, 500, 550 | Compatible | ComfoAir serial protocol |
+| Zehnder ComfoD 300, 350, 450, 550 | Compatible | ComfoAir serial protocol |
+| Zehnder ComfoAir E300, E400 | Not compatible | Modbus RTU/TCP; use [remmob/comfoair](https://github.com/remmob/comfoair) for Home Assistant support |
+| Zehnder ComfoAir Q350, Q450, Q600 | Not compatible | CAN; not supported by this component |
+
+For support with the E300 or E400, including RS485 adapters and gateways such
+as the Elfin EW-11, see the [remmob/comfoair Home Assistant
+integration](https://github.com/remmob/comfoair).
+
 Port of the ComfoAir protocol to ESPHome.io firmware, which is supported by external_components.
 
 The component sends one protocol request every two seconds. After the initial
@@ -196,23 +213,6 @@ The sensor defined here is a full list of sensors - if you remove a sensor from 
 
 For visualization:
 Checkout https://github.com/wichers/lovelace-comfoair and follow the instructions.
-
-## Compatibility
-
-This component implements the legacy ComfoAir serial protocol. The table below
-lists the device families with confirmed reports and known alternatives.
-
-| Models | Status | Protocol and support |
-| --- | --- | --- |
-| Zehnder WHR 930, WHR 950 | Compatible | ComfoAir serial protocol |
-| Zehnder ComfoAir 160, 200, 500, 550 | Compatible | ComfoAir serial protocol |
-| Zehnder ComfoD 300, 350, 450, 550 | Compatible | ComfoAir serial protocol |
-| Zehnder ComfoAir E300, E400 | Not compatible | Modbus RTU/TCP; use [remmob/comfoair](https://github.com/remmob/comfoair) for Home Assistant support |
-| Zehnder ComfoAir Q350, Q450, Q600 | Not compatible | CAN; not supported by this component |
-
-For support with the E300 or E400, including RS485 adapters and gateways such
-as the Elfin EW-11, see the [remmob/comfoair Home Assistant
-integration](https://github.com/remmob/comfoair).
 
 ## Support my work
 Thank you for thinking about supporting my work.
