@@ -2,19 +2,51 @@
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import binary_sensor, sensor, text_sensor, uart, climate, select, number, button
-from esphome.const import (CONF_ID, CONF_UART_ID, DEVICE_CLASS_CURRENT,
-                           DEVICE_CLASS_EMPTY, DEVICE_CLASS_SPEED,
-                           DEVICE_CLASS_TEMPERATURE, DEVICE_CLASS_VOLUME,
-                           STATE_CLASS_MEASUREMENT, UNIT_AMPERE, UNIT_CELSIUS,
-                           UNIT_CUBIC_METER, UNIT_HOUR, UNIT_MINUTE,
-                           UNIT_PERCENT, UNIT_REVOLUTIONS_PER_MINUTE, CONF_DISABLED_BY_DEFAULT,
-                           ICON_FAN, CONF_ICON, CONF_INITIAL_VALUE, CONF_MIN_VALUE, CONF_MAX_VALUE, CONF_STEP)
+from esphome.components import (
+    binary_sensor,
+    button,
+    climate,
+    number,
+    select,
+    sensor,
+    text_sensor,
+    uart,
+)
+from esphome.const import (
+    CONF_DISABLED_BY_DEFAULT,
+    CONF_ICON,
+    CONF_ID,
+    CONF_INITIAL_VALUE,
+    CONF_MAX_VALUE,
+    CONF_MIN_VALUE,
+    CONF_STEP,
+    CONF_UART_ID,
+    DEVICE_CLASS_CURRENT,
+    DEVICE_CLASS_EMPTY,
+    DEVICE_CLASS_SPEED,
+    DEVICE_CLASS_TEMPERATURE,
+    DEVICE_CLASS_VOLUME,
+    ICON_FAN,
+    STATE_CLASS_MEASUREMENT,
+    UNIT_AMPERE,
+    UNIT_CELSIUS,
+    UNIT_CUBIC_METER,
+    UNIT_HOUR,
+    UNIT_MINUTE,
+    UNIT_PERCENT,
+    UNIT_REVOLUTIONS_PER_MINUTE,
+)
 
 comfoair_ns = cg.esphome_ns.namespace("comfoair")
-ComfoAirComponent = comfoair_ns.class_('ComfoAirComponent', climate.Climate, cg.Component, uart.UARTDevice)
+
+# ESPHome codegen handles intentionally mirror their generated C++ class names.
+# pylint: disable=invalid-name
+ComfoAirComponent = comfoair_ns.class_(
+    "ComfoAirComponent", climate.Climate, cg.Component, uart.UARTDevice
+)
 ComfoAirNumber = comfoair_ns.class_("ComfoAirNumber", number.Number)
 ComfoAirSyncButton = comfoair_ns.class_("ComfoAirSyncButton", button.Button)
+# pylint: enable=invalid-name
 
 DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor", "select", "number", "button"]
@@ -218,7 +250,10 @@ helper_comfoair = {
     ],
 }
 
-ComfoAirSizeSelect = comfoair_ns.class_("ComfoAirSizeSelect", select.Select)
+# This codegen handle also mirrors its generated C++ class name.
+ComfoAirSizeSelect = comfoair_ns.class_(  # pylint: disable=invalid-name
+    "ComfoAirSizeSelect", select.Select
+)
 
 comfoair_sensors_schemas = cv.Schema(
     {
@@ -644,14 +679,13 @@ comfoair_sensors_schemas = cv.Schema(
 )
 
 CONFIG_SCHEMA = (
-  climate.climate_schema(ComfoAirComponent)
-  .extend(
-    {
-      cv.Required(REQUIRED_KEY_NAME): cv.string,
-    }
-  )
-  .extend(uart.UART_DEVICE_SCHEMA)
-  .extend(comfoair_sensors_schemas)
+    climate.climate_schema(ComfoAirComponent).extend(
+        {
+            cv.Required(REQUIRED_KEY_NAME): cv.string,
+        }
+    )
+    .extend(uart.UART_DEVICE_SCHEMA)
+    .extend(comfoair_sensors_schemas)
 )
 
 def to_code(config):

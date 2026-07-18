@@ -8,3 +8,4 @@
 secrets.yaml
 .esphome
 __pycache__
+.DS_Store
