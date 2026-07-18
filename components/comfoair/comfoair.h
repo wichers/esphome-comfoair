@@ -630,14 +630,15 @@ namespace esphome
         }
         case RES_GET_FAULTS:
         {
+          const uint8_t status = msg[8];
           if (filter_status != nullptr)
           {
-            uint8_t status = msg[8];
             filter_status->publish_state(status == 0 ? "Ok" : (status == 1 ? "Full" : "Unknown"));
           }
-          if (filter_status_full != nullptr)
+          // Keep the binary sensor unknown when the protocol does not report a valid OK/full value.
+          if (filter_status_full != nullptr && status <= 1)
           {
-            filter_status_full->publish_state(msg[8] == 1);
+            filter_status_full->publish_state(status == 1);
           }
           break;
         }

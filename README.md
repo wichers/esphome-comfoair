@@ -69,6 +69,7 @@ comfoair:
     name: "supply_fan_active"
   filter_status:
     name: "filter_status"
+  # Binary companion: ON when the filter is full, OFF when it is OK.
   filter_status_full:
     name: "filter_status_full"
   enthalpy_present:
