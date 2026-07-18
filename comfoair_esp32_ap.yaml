@@ -154,6 +154,8 @@ comfoair:
     name: "Supply fan active"
   filter_status:
     name: "Filter status"
+  filter_status_full:
+    name: "filter_status_full"
   enthalpy_present:
     name: "Enthalpy present"
   ewt_present:
