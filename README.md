@@ -9,8 +9,15 @@ This component implements the legacy ComfoAir serial protocol.
 | Zehnder WHR 930, WHR 950 | Compatible | ComfoAir serial protocol |
 | Zehnder ComfoAir 160, 200, 500, 550 | Compatible | ComfoAir serial protocol |
 | Zehnder ComfoD 300, 350, 450, 550 | Compatible | ComfoAir serial protocol |
+| Zehnder ComfoAir G90-300 | Not compatible | RS485/ComfoControl Avignon protocol; see [gunzebe/zehnder-comfoair-ha](https://github.com/gunzebe/zehnder-comfoair-ha) for a Home Assistant/MQTT alternative with an RS485 mode |
 | Zehnder ComfoAir E300, E400 | Not compatible | Modbus RTU/TCP; use [remmob/comfoair](https://github.com/remmob/comfoair) for Home Assistant support |
 | Zehnder ComfoAir Q350, Q450, Q600 | Not compatible | CAN; not supported by this component |
+
+On the G90-300, a D-SUB connector can carry RS485 rather than standard RS232.
+This component will not work with that interface through a MAX3232 or other
+TTL-to-RS232 adapter. Do not assume the pinout from the connector shape; verify
+the unit's A, B, and ground pins from its service documentation before using an
+RS485 adapter.
 
 For support with the E300 or E400, including RS485 adapters and gateways such
 as the Elfin EW-11, see the [remmob/comfoair Home Assistant
