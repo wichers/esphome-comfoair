@@ -199,24 +199,20 @@ Checkout https://github.com/wichers/lovelace-comfoair and follow the instruction
 
 ## Compatibility
 
-This is a list of models that are known to work, feel free to add yours if you tested it successfully:
+This component implements the legacy ComfoAir serial protocol. The table below
+lists the device families with confirmed reports and known alternatives.
 
-* Zehnder WHR 930
-* Zehnder WHR 950
-* Zehnder ComfoAir 160
-* Zehnder ComfoAir 200
-* Zehnder ComfoAir 500
-* Zehnder Comfoair 550
-* Zehnder ComfoD 300
-* Zehnder ComfoD 350
-* Zehnder ComfoD 450
-* Zehnder ComfoD 550
+| Models | Status | Protocol and support |
+| --- | --- | --- |
+| Zehnder WHR 930, WHR 950 | Compatible | ComfoAir serial protocol |
+| Zehnder ComfoAir 160, 200, 500, 550 | Compatible | ComfoAir serial protocol |
+| Zehnder ComfoD 300, 350, 450, 550 | Compatible | ComfoAir serial protocol |
+| Zehnder ComfoAir E300, E400 | Not compatible | Modbus RTU/TCP; use [remmob/comfoair](https://github.com/remmob/comfoair) for Home Assistant support |
+| Zehnder ComfoAir Q350, Q450, Q600 | Not compatible | CAN; not supported by this component |
 
-## Incompatible
-
-* Zehnder ComfoAir Q350 (CAN)
-* Zehnder ComfoAir Q450 (CAN)
-* Zehnder ComfoAir Q600 (CAN)
+For support with the E300 or E400, including RS485 adapters and gateways such
+as the Elfin EW-11, see the [remmob/comfoair Home Assistant
+integration](https://github.com/remmob/comfoair).
 
 ## Support my work
 Thank you for thinking about supporting my work.
