@@ -3,7 +3,11 @@ name: Pylint
 on:
   push:
     branches: [master]
+    paths:
+      - "**/*.py"
   pull_request:
+    paths:
+      - "**/*.py"
 
 permissions:
   contents: read
