@@ -9,6 +9,7 @@ This component implements the legacy ComfoAir serial protocol.
 | Zehnder WHR 930, WHR 950 | Compatible | ComfoAir serial protocol |
 | Zehnder ComfoAir 160, 200, 500, 550 | Compatible | ComfoAir serial protocol |
 | Zehnder ComfoD 300, 350, 450, 550 | Compatible | ComfoAir serial protocol |
+| Legacy RS232 models with a connected ComfoSense panel | Use alternative fork | Sharing the connection with ComfoSense is not supported here; use [julianpas/esphome-comfoair](https://github.com/julianpas/esphome-comfoair) for dual-UART proxy support |
 | Zehnder ComfoAir G90-300 | Not compatible | RS485/ComfoControl Avignon protocol; see [gunzebe/zehnder-comfoair-ha](https://github.com/gunzebe/zehnder-comfoair-ha) for a Home Assistant/MQTT alternative with an RS485 mode |
 | Zehnder ComfoAir E300, E400 | Not compatible | Modbus RTU/TCP; use [remmob/comfoair](https://github.com/remmob/comfoair) for Home Assistant support |
 | Zehnder ComfoAir Q350, Q450, Q600 | Not compatible | CAN; not supported by this component |
