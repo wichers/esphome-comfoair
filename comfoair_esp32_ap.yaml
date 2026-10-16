@@ -158,6 +158,12 @@ comfoair:
     name: "Filter status"
   filter_status_full:
     name: "filter_status_full"
+  error_status:
+    name: "Error status"
+  filter_reset:
+    name: "Filter reset"
+  error_reset:
+    name: "Error reset"
   enthalpy_present:
     name: "Enthalpy present"
   ewt_present:

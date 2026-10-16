@@ -79,11 +79,37 @@ private:
   ComfoAirComponent *parent_{nullptr};
 };
 
+class ComfoAirFilterResetButton : public button::Button
+{
+public:
+  void set_parent(ComfoAirComponent *parent) { this->parent_ = parent; }
+
+protected:
+  void press_action() override;
+
+private:
+  ComfoAirComponent *parent_{nullptr};
+};
+
+class ComfoAirErrorResetButton : public button::Button
+{
+public:
+  void set_parent(ComfoAirComponent *parent) { this->parent_ = parent; }
+
+protected:
+  void press_action() override;
+
+private:
+  ComfoAirComponent *parent_{nullptr};
+};
+
 class ComfoAirComponent : public climate::Climate, public PollingComponent, public uart::UARTDevice
 {
   friend class ComfoAirSizeSelect;
   friend class ComfoAirNumber;
   friend class ComfoAirSyncButton;
+  friend class ComfoAirFilterResetButton;
+  friend class ComfoAirErrorResetButton;
 
 public:
   // Poll every 2000ms (previously 600ms)
@@ -893,6 +919,17 @@ protected:
       {
         filter_status->publish_state(status == 0 ? "Ok" : (status == 1 ? "Full" : "Unknown"));
       }
+      if (error_status != nullptr)
+      {
+        std::string faults;
+        this->append_fault_bits_(faults, msg_data[0], "A", 1);
+        this->append_fault_bits_(faults, msg_data[1], "E", 1);
+        if (msg_length_u8 >= 10)
+          this->append_fault_bits_(faults, msg_data[9], "EA", 1);
+        if (msg_length_u8 >= 14)
+          this->append_fault_ahigh_(faults, msg_data[13]);
+        error_status->publish_state(faults.empty() ? "None" : faults);
+      }
       // Keep the binary sensor unknown when the protocol does not report a valid OK/full value.
       if (filter_status_full != nullptr && status <= 1)
       {
@@ -1263,6 +1300,40 @@ protected:
 
   // --- getter ---
 
+  void append_fault_bits_(std::string &out, uint8_t bits, const char *prefix, int start_num) const
+  {
+    for (int i = 0; i < 8; i++)
+    {
+      if (bits & (1u << i))
+      {
+        if (!out.empty())
+          out += ", ";
+        out += prefix;
+        out += std::to_string(start_num + i);
+      }
+    }
+  }
+
+  void append_fault_ahigh_(std::string &out, uint8_t bits) const
+  {
+    for (int i = 0; i < 7; i++)
+    {
+      if (bits & (1u << i))
+      {
+        if (!out.empty())
+          out += ", ";
+        out += "A";
+        out += std::to_string(9 + i);
+      }
+    }
+    if (bits & 0x80)
+    {
+      if (!out.empty())
+        out += ", ";
+      out += "A0";
+    }
+  }
+
   void get_fan_status_()
   {
     if (intake_fan_speed != nullptr || exhaust_fan_speed != nullptr || intake_fan_speed_rpm != nullptr ||
@@ -1284,7 +1355,7 @@ protected:
 
   void get_error_status_()
   {
-    if (filter_status != nullptr || filter_status_full != nullptr)
+    if (filter_status != nullptr || filter_status_full != nullptr || error_status != nullptr)
     {
       ESP_LOGD(TAG, "getting error status");
       write_command_(CMD_GET_FAULTS, nullptr, 0);
@@ -1370,6 +1441,7 @@ public:
   text_sensor::TextSensor *type{nullptr};
   text_sensor::TextSensor *size{nullptr};
   text_sensor::TextSensor *filter_status{nullptr};
+  text_sensor::TextSensor *error_status{nullptr};
   binary_sensor::BinarySensor *filter_status_full{nullptr};
   text_sensor::TextSensor *frost_protection_level{nullptr};
   text_sensor::TextSensor *preheating_valve{nullptr};
@@ -1453,6 +1525,8 @@ public:
   ComfoAirNumber *supply_air_level_medium{nullptr};
   ComfoAirNumber *supply_air_level_high{nullptr};
   ComfoAirSyncButton *sync_button_{nullptr};
+  ComfoAirFilterResetButton *filter_reset_button_{nullptr};
+  ComfoAirErrorResetButton *error_reset_button_{nullptr};
 
   // public functions
 
@@ -1691,6 +1765,19 @@ public:
     if (button != nullptr)
       button->set_parent(this);
   }
+  void set_error_status(text_sensor::TextSensor *sensor) { this->error_status = sensor; }
+  void set_filter_reset(ComfoAirFilterResetButton *button)
+  {
+    this->filter_reset_button_ = button;
+    if (button != nullptr)
+      button->set_parent(this);
+  }
+  void set_error_reset(ComfoAirErrorResetButton *button)
+  {
+    this->error_reset_button_ = button;
+    if (button != nullptr)
+      button->set_parent(this);
+  }
 };
 
 inline const char *ComfoAirComponent::unit_size_text_label_(uint8_t raw_size) const
@@ -1839,6 +1926,18 @@ inline void ComfoAirSyncButton::press_action()
   {
     this->parent_->set_fan_percentages();
   }
+}
+
+inline void ComfoAirFilterResetButton::press_action()
+{
+  if (this->parent_ != nullptr)
+    this->parent_->filter_reset();
+}
+
+inline void ComfoAirErrorResetButton::press_action()
+{
+  if (this->parent_ != nullptr)
+    this->parent_->error_reset();
 }
 
 } // namespace comfoair
