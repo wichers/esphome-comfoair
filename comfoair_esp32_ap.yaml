@@ -98,14 +98,20 @@ text_sensor:
     hide_timestamp: true
 
 uart:
-  id: uart_bus
-  baud_rate: 9600
-  tx_pin: 17
-  rx_pin: 16
+  - id: uart_bus
+    baud_rate: 9600
+    tx_pin: 17
+    rx_pin: 16
+  # Optional: original wall controller (CCEase / ComfoSense) on a second UART.
+  # - id: uart_proxy
+  #   baud_rate: 9600
+  #   tx_pin: 19
+  #   rx_pin: 18
 
 comfoair:
   name: "${device_name}"
   uart_id: uart_bus
+  # proxy_uart: uart_proxy
   type:
     name: "Type"
   size:

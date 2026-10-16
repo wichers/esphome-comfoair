@@ -54,6 +54,7 @@ DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor", "select", "number", "button"]
 REQUIRED_KEY_NAME = "name"
 CONF_HUB_ID = "comfoair"
+CONF_PROXY_UART_ID = "proxy_uart"
 
 UNIT_WEEK = "weeks"
 
@@ -561,6 +562,7 @@ CONFIG_SCHEMA = (
     climate.climate_schema(ComfoAirComponent).extend(
         {
             cv.Required(REQUIRED_KEY_NAME): cv.string,
+            cv.Optional(CONF_PROXY_UART_ID): cv.use_id(uart.UARTComponent),
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -587,6 +589,9 @@ async def to_code(config):
     cg.add(var.set_name(config[REQUIRED_KEY_NAME]))
     paren = await cg.get_variable(config[CONF_UART_ID])
     cg.add(var.set_uart_component(paren))
+    if CONF_PROXY_UART_ID in config:
+        proxy_uart = await cg.get_variable(config[CONF_PROXY_UART_ID])
+        cg.add(var.set_proxy_uart_component(proxy_uart))
     for k, values in helper_comfoair.items():
         for v in values:
             if not v in config:
