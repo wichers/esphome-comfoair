@@ -12,7 +12,8 @@ tests/.esphome/build/comfoair-protocol/.pioenvs/comfoair-protocol/program
 
 The Python tests invoke the real ESPHome CLI in temporary directories. They
 cover issue #97 (no implicit size select), explicit name/ID-only selects,
-code generation, and rejection of each invalid UART setting or missing pin.
+code generation for all 87 optional component entities, fan-number defaults,
+and rejection of each invalid UART setting or missing pin.
 
 `protocol.yaml` builds a native host executable using the actual component and
 ESPHome classes, not a reimplementation of the parser. A fake UART captures TX
@@ -29,6 +30,13 @@ Protocol coverage:
 - Incoming ACKs, ACK transmission for valid messages, and no ACK for invalid
   or incomplete messages or incoming ACKs.
 
+Decoder fixtures exercise every response dispatch branch: version data, fans
+(including zero-period RPM), valves, bypass control, both temperature formats,
+ventilation levels/numbers, faults, status bits, hours, preheating and delays.
+They check presence masks and unknown binary/text values as well as climate
+fan commands for all five modes and the encoded target temperature. These
+are synthetic fixtures from `registers.h`, not captured device traffic.
+
 The host harness targets ESPHome 2026.10.0's UART C++ API. Configuration and
 firmware CI separately target 2026.8.1 and 2026.10.0, covering ESP32-S3/ESP-IDF,
 ESP32/ESP-IDF, ESP32/Arduino, ESP8266, and an entity-minimal configuration.
@@ -38,4 +46,8 @@ build logs. Version pins are deliberate: update them when testing new releases.
 
 These are build and software tests, not a physical UART/timing or Home Assistant
 integration test. They do not prove every decoded sensor value or climate control
-command against real hardware.
+command against real hardware. A passive OTA smoke test must use the actual
+installation YAML and secrets, not these fixtures. Before uploading, verify the
+board, flash/PSRAM settings, UART pins, live Wi-Fi SSID and target address;
+record entity identities and sensor readings, then compare after reboot without
+operating reset/installer controls.
