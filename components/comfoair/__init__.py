@@ -255,6 +255,30 @@ ComfoAirSizeSelect = comfoair_ns.class_(  # pylint: disable=invalid-name
     "ComfoAirSizeSelect", select.Select
 )
 
+def _measurement_schema(*, device_class=DEVICE_CLASS_EMPTY, accuracy_decimals=0, **kwargs):
+    """Keep measurement defaults consistent without changing entity metadata."""
+    return sensor.sensor_schema(
+        device_class=device_class,
+        accuracy_decimals=accuracy_decimals,
+        state_class=STATE_CLASS_MEASUREMENT,
+        **kwargs,
+    )
+
+
+def _fan_level_schema(initial_value):
+    """Fan-level entities share limits but retain their per-level initial value."""
+    return number.number_schema(
+        ComfoAirNumber,
+        unit_of_measurement=UNIT_PERCENT,
+        icon=ICON_FAN,
+    ).extend({
+        cv.Optional(CONF_INITIAL_VALUE, default=initial_value): cv.positive_float,
+        cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
+        cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
+        cv.Optional(CONF_STEP, default=1): cv.positive_float,
+    })
+
+
 comfoair_sensors_schemas = cv.Schema(
     {
         cv.Optional(CONF_TYPE): text_sensor.text_sensor_schema(),
@@ -266,226 +290,136 @@ comfoair_sensors_schemas = cv.Schema(
             ComfoAirSizeSelect
         ).extend(),
 
-        cv.Optional(CONF_INTAKE_FAN_SPEED): sensor.sensor_schema(
+        cv.Optional(CONF_INTAKE_FAN_SPEED): _measurement_schema(
             device_class=DEVICE_CLASS_SPEED,
             unit_of_measurement=UNIT_PERCENT,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_EXHAUST_FAN_SPEED): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_EXHAUST_FAN_SPEED): _measurement_schema(
             device_class=DEVICE_CLASS_SPEED,
             unit_of_measurement=UNIT_PERCENT,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_INTAKE_FAN_SPEED_RPM): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_INTAKE_FAN_SPEED_RPM): _measurement_schema(
             device_class=DEVICE_CLASS_SPEED,
             unit_of_measurement=UNIT_REVOLUTIONS_PER_MINUTE,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_EXHAUST_FAN_SPEED_RPM): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_EXHAUST_FAN_SPEED_RPM): _measurement_schema(
             device_class=DEVICE_CLASS_SPEED,
             unit_of_measurement=UNIT_REVOLUTIONS_PER_MINUTE,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_VENTILATION_LEVEL): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_OUTSIDE_AIR_TEMPERATURE): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_VENTILATION_LEVEL): _measurement_schema(),
+        cv.Optional(CONF_OUTSIDE_AIR_TEMPERATURE): _measurement_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_SUPPLY_AIR_TEMPERATURE): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_SUPPLY_AIR_TEMPERATURE): _measurement_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_RETURN_AIR_TEMPERATURE): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_RETURN_AIR_TEMPERATURE): _measurement_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_EXHAUST_AIR_TEMPERATURE): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_EXHAUST_AIR_TEMPERATURE): _measurement_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_ENTHALPY_TEMPERATURE): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_ENTHALPY_TEMPERATURE): _measurement_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_EWT_TEMPERATURE): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_EWT_TEMPERATURE): _measurement_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_REHEATING_TEMPERATURE): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_REHEATING_TEMPERATURE): _measurement_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_KITCHEN_HOOD_TEMPERATURE): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_KITCHEN_HOOD_TEMPERATURE): _measurement_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_RETURN_AIR_LEVEL): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_RETURN_AIR_LEVEL): _measurement_schema(
             device_class=DEVICE_CLASS_VOLUME,
             unit_of_measurement=UNIT_CUBIC_METER,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL): _measurement_schema(
             device_class=DEVICE_CLASS_VOLUME,
             unit_of_measurement=UNIT_CUBIC_METER,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_BYPASS_FACTOR): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_BYPASS_FACTOR): _measurement_schema(
             device_class=DEVICE_CLASS_VOLUME,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_BYPASS_STEP): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_BYPASS_STEP): _measurement_schema(
             device_class=DEVICE_CLASS_VOLUME,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_BYPASS_CORRECTION): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_BYPASS_CORRECTION): _measurement_schema(
             device_class=DEVICE_CLASS_VOLUME,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_BYPASS_OPEN_HOURS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        ),
+        cv.Optional(CONF_BYPASS_OPEN_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_MOTOR_CURRENT_BYPASS): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_MOTOR_CURRENT_BYPASS): _measurement_schema(
             device_class=DEVICE_CLASS_CURRENT,
             unit_of_measurement=UNIT_AMPERE,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_MOTOR_CURRENT_PREHEATING): sensor.sensor_schema(
+        ),
+        cv.Optional(CONF_MOTOR_CURRENT_PREHEATING): _measurement_schema(
             device_class=DEVICE_CLASS_CURRENT,
             unit_of_measurement=UNIT_AMPERE,
             accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
+        ),
 
-        cv.Optional(CONF_PREHEATING_HOURS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        cv.Optional(CONF_PREHEATING_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_LEVEL0_HOURS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        ),
+        cv.Optional(CONF_LEVEL0_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_LEVEL1_HOURS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        ),
+        cv.Optional(CONF_LEVEL1_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_LEVEL2_HOURS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        ),
+        cv.Optional(CONF_LEVEL2_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_LEVEL3_HOURS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        ),
+        cv.Optional(CONF_LEVEL3_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_FROST_PROTECTION_HOURS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        ),
+        cv.Optional(CONF_FROST_PROTECTION_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_FROST_PROTECTION_MINUTES): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        ),
+        cv.Optional(CONF_FROST_PROTECTION_MINUTES): _measurement_schema(
             unit_of_measurement=UNIT_MINUTE,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_FILTER_HOURS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        ),
+        cv.Optional(CONF_FILTER_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
+        ),
 
-        cv.Optional(CONF_BYPASS_VALVE): sensor.sensor_schema(
+        cv.Optional(CONF_BYPASS_VALVE): _measurement_schema(
             device_class=DEVICE_CLASS_VOLUME,
             unit_of_measurement=UNIT_PERCENT,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
+        ),
 
-        cv.Optional(CONF_BATHROOM_SWITCH_ON_DELAY_MINUTES): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_BATHROOM_SWITCH_OFF_DELAY_MINUTES): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_L1_SWITCH_OFF_DELAY_MINUTES): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_BOOST_VENTILATION_MINUTES): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_FILTER_WARNING_WEEKS): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
+        cv.Optional(CONF_BATHROOM_SWITCH_ON_DELAY_MINUTES): _measurement_schema(),
+        cv.Optional(CONF_BATHROOM_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(),
+        cv.Optional(CONF_L1_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(),
+        cv.Optional(CONF_BOOST_VENTILATION_MINUTES): _measurement_schema(),
+        cv.Optional(CONF_FILTER_WARNING_WEEKS): _measurement_schema(
             unit_of_measurement=UNIT_WEEK,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_RF_HIGH_TIME_SHORT_MINUTES): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_RF_HIGH_TIME_LONG_MINUTES): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
-        cv.Optional(CONF_EXTRACTOR_HOOD_SWITCH_OFF_DELAY_MINUTES): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY,
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-        ).extend(),
+        ),
+        cv.Optional(CONF_RF_HIGH_TIME_SHORT_MINUTES): _measurement_schema(),
+        cv.Optional(CONF_RF_HIGH_TIME_LONG_MINUTES): _measurement_schema(),
+        cv.Optional(CONF_EXTRACTOR_HOOD_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(),
 
         cv.Optional(CONF_FROST_PROTECTION_ACTIVE): binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_EMPTY
@@ -591,86 +525,14 @@ comfoair_sensors_schemas = cv.Schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
 
-        cv.Optional(CONF_RETURN_AIR_LEVEL_ABSENT): number.number_schema(
-            ComfoAirNumber,
-            unit_of_measurement=UNIT_PERCENT,
-            icon=ICON_FAN,
-        ).extend({
-            cv.Optional(CONF_INITIAL_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-            cv.Optional(CONF_STEP, default=1): cv.positive_float,
-        }),
-        cv.Optional(CONF_RETURN_AIR_LEVEL_LOW): number.number_schema(
-            ComfoAirNumber,
-            unit_of_measurement=UNIT_PERCENT,
-            icon=ICON_FAN,
-        ).extend({
-            cv.Optional(CONF_INITIAL_VALUE, default=35): cv.positive_float,
-            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-            cv.Optional(CONF_STEP, default=1): cv.positive_float,
-        }),
-        cv.Optional(CONF_RETURN_AIR_LEVEL_MEDIUM): number.number_schema(
-            ComfoAirNumber,
-            unit_of_measurement=UNIT_PERCENT,
-            icon=ICON_FAN,
-        ).extend({
-            cv.Optional(CONF_INITIAL_VALUE, default=50): cv.positive_float,
-            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-            cv.Optional(CONF_STEP, default=1): cv.positive_float,
-        }),
-        cv.Optional(CONF_RETURN_AIR_LEVEL_HIGH): number.number_schema(
-            ComfoAirNumber,
-            unit_of_measurement=UNIT_PERCENT,
-            icon=ICON_FAN,
-        ).extend({
-            cv.Optional(CONF_INITIAL_VALUE, default=70): cv.positive_float,
-            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-            cv.Optional(CONF_STEP, default=1): cv.positive_float,
-        }),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL_ABSENT): number.number_schema(
-            ComfoAirNumber,
-            unit_of_measurement=UNIT_PERCENT,
-            icon=ICON_FAN,
-        ).extend({
-            cv.Optional(CONF_INITIAL_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-            cv.Optional(CONF_STEP, default=1): cv.positive_float,
-        }),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL_LOW): number.number_schema(
-            ComfoAirNumber,
-            unit_of_measurement=UNIT_PERCENT,
-            icon=ICON_FAN,
-        ).extend({
-            cv.Optional(CONF_INITIAL_VALUE, default=35): cv.positive_float,
-            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-            cv.Optional(CONF_STEP, default=1): cv.positive_float,
-        }),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL_MEDIUM): number.number_schema(
-            ComfoAirNumber,
-            unit_of_measurement=UNIT_PERCENT,
-            icon=ICON_FAN,
-        ).extend({
-            cv.Optional(CONF_INITIAL_VALUE, default=50): cv.positive_float,
-            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-            cv.Optional(CONF_STEP, default=1): cv.positive_float,
-        }),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL_HIGH): number.number_schema(
-            ComfoAirNumber,
-            unit_of_measurement=UNIT_PERCENT,
-            icon=ICON_FAN,
-        ).extend({
-            cv.Optional(CONF_INITIAL_VALUE, default=70): cv.positive_float,
-            cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-            cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-            cv.Optional(CONF_STEP, default=1): cv.positive_float,
-        }),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_ABSENT): _fan_level_schema(15),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_LOW): _fan_level_schema(35),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_MEDIUM): _fan_level_schema(50),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_HIGH): _fan_level_schema(70),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_ABSENT): _fan_level_schema(15),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_LOW): _fan_level_schema(35),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_MEDIUM): _fan_level_schema(50),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_HIGH): _fan_level_schema(70),
         cv.Optional(CONF_SYNC_FAN_LEVELS): button.button_schema(
             ComfoAirSyncButton,
             icon="mdi:sync",
