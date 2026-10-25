@@ -688,6 +688,17 @@ CONFIG_SCHEMA = (
     .extend(comfoair_sensors_schemas)
 )
 
+FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
+    "comfoair",
+    baud_rate=9600,
+    require_rx=True,
+    require_tx=True,
+    data_bits=8,
+    parity="NONE",
+    stop_bits=1,
+)
+
+
 def to_code(config):
     """Generates code"""
     var = cg.new_Pvariable(config[CONF_ID])

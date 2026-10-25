@@ -177,7 +177,6 @@ public:
     {
       ESP_LOGCONFIG(TAG, "  CC-Luxe v%0d.%02d", *(p + 13) >> 4, *(p + 13) & 0x0f);
     }
-    check_uart_settings(9600);
   }
 
   void update() override
