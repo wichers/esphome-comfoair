@@ -699,14 +699,14 @@ FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
 )
 
 
-def to_code(config):
+async def to_code(config):
     """Generates code"""
     var = cg.new_Pvariable(config[CONF_ID])
-    yield cg.register_component(var, config)
-    yield uart.register_uart_device(var, config)
-    yield climate.register_climate(var, config)
+    await cg.register_component(var, config)
+    await uart.register_uart_device(var, config)
+    await climate.register_climate(var, config)
     cg.add(var.set_name(config[REQUIRED_KEY_NAME]))
-    paren = yield cg.get_variable(config[CONF_UART_ID])
+    paren = await cg.get_variable(config[CONF_UART_ID])
     cg.add(var.set_uart_component(paren))
     for k, values in helper_comfoair.items():
         for v in values:
@@ -714,22 +714,22 @@ def to_code(config):
                 continue
             sens = None
             if k == "sensor":
-                sens = yield sensor.new_sensor(config[v])
+                sens = await sensor.new_sensor(config[v])
             elif k == "binary_sensor":
-                sens = yield binary_sensor.new_binary_sensor(config[v])
+                sens = await binary_sensor.new_binary_sensor(config[v])
             elif k == "text_sensor":
-                sens = yield text_sensor.new_text_sensor(config[v])
+                sens = await text_sensor.new_text_sensor(config[v])
             elif k == "select":
-                sens = yield select.new_select(config[v], options=["Large", "Small"])
+                sens = await select.new_select(config[v], options=["Large", "Small"])
             elif k == "number":
-                sens = yield number.new_number(
+                sens = await number.new_number(
                     config[v],
                     min_value=config[v][CONF_MIN_VALUE],
                     max_value=config[v][CONF_MAX_VALUE],
                     step=config[v][CONF_STEP],
                     )
             elif k == "button":
-                sens = yield button.new_button(config[v])
+                sens = await button.new_button(config[v])
             if sens is not None:
                 func = getattr(var, "set_" + v)
                 cg.add(func(sens))
