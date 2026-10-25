@@ -42,7 +42,195 @@ class TestComfoAir : public esphome::comfoair::ComfoAirComponent {
   using ComfoAirComponent::calcChecksum_;
   using ComfoAirComponent::checkRx_;
   using ComfoAirComponent::write_command_;
+  using ComfoAirComponent::parseRxMessage_;
+  using ComfoAirComponent::bootloader_version_;
+  using ComfoAirComponent::firmware_version_;
+  using ComfoAirComponent::connector_board_version_;
 };
+
+// Synthetic fixtures based on registers.h; these are not captured unit traffic.
+inline void run_decoder_tests() {
+  using namespace esphome;
+  TestUART uart;
+  TestComfoAir component;
+  component.set_uart_parent(&uart);
+  auto decode = [&](uint8_t command, std::initializer_list<uint8_t> payload) {
+    std::vector<uint8_t> message{0, command, uint8_t(payload.size())};
+    message.insert(message.end(), payload.begin(), payload.end());
+    component.parseRxMessage_(message.data());
+  };
+  decode(RES_GET_BOOTLOADER_VERSION, {3, 70, 32});
+  decode(RES_GET_FIRMWARE_VERSION, {3, 71, 33});
+  decode(RES_GET_CONNECTOR_BOARD_VERSION, {2, 12});
+  CHECK(component.bootloader_version_[1] == 70);
+  CHECK(component.firmware_version_[2] == 33);
+  CHECK(component.connector_board_version_[1] == 12);
+
+  sensor::Sensor intake, exhaust, intake_rpm, exhaust_rpm;
+  component.intake_fan_speed = &intake;
+  component.exhaust_fan_speed = &exhaust;
+  component.intake_fan_speed_rpm = &intake_rpm;
+  component.exhaust_fan_speed_rpm = &exhaust_rpm;
+  decode(RES_GET_FAN_STATUS, {35, 45, 0x03, 0xE8, 0x07, 0xD0});
+  CHECK(intake.state == 35 && exhaust.state == 45);
+  CHECK(intake_rpm.state == 1875 && exhaust_rpm.state == 937);
+  decode(RES_GET_FAN_STATUS, {0, 0, 0, 0, 0, 0});
+  CHECK(intake_rpm.state == 0 && exhaust_rpm.state == 0);
+
+  sensor::Sensor bypass, bypass_current, preheat_current;
+  binary_sensor::BinarySensor bypass_open, preheat_open;
+  component.bypass_valve = &bypass;
+  component.bypass_valve_open = &bypass_open;
+  component.preheating_state = &preheat_open;
+  component.motor_current_bypass = &bypass_current;
+  component.motor_current_preheating = &preheat_current;
+  decode(RES_GET_VALVE_STATUS, {100, 1, 12, 34});
+  CHECK(bypass.state == 100 && bypass_open.state && preheat_open.state);
+  CHECK(bypass_current.state == 12 && preheat_current.state == 34);
+  decode(RES_GET_VALVE_STATUS, {0, 2, 0, 0});
+  CHECK(!bypass_open.state && preheat_open.state);  // Unknown must not become closed.
+
+  sensor::Sensor factor, step, correction;
+  binary_sensor::BinarySensor summer;
+  component.bypass_factor = &factor;
+  component.bypass_step = &step;
+  component.bypass_correction = &correction;
+  component.summer_mode = &summer;
+  decode(RES_GET_BYPASS_CONTROL_STATUS, {0, 0, 10, 20, 30, 0, 1});
+  CHECK(factor.state == 10 && step.state == 20 && correction.state == 30);
+  CHECK(summer.state);
+
+  sensor::Sensor outside, supply, returning, exiting, enthalpy, ewt, reheating, hood;
+  component.outside_air_temperature = &outside;
+  component.supply_air_temperature = &supply;
+  component.return_air_temperature = &returning;
+  component.exhaust_air_temperature = &exiting;
+  component.enthalpy_temperature = &enthalpy;
+  component.ewt_temperature = &ewt;
+  component.reheating_temperature = &reheating;
+  component.kitchen_hood_temperature = &hood;
+  decode(RES_GET_TEMPERATURE_STATUS, {0, 40, 80, 81});
+  CHECK(outside.state == -20 && supply.state == 0);
+  CHECK(returning.state == 20 && exiting.state == 20.5f);
+  decode(RES_GET_SENSOR_DATA, {90});
+  CHECK(enthalpy.state == 25);
+  decode(RES_GET_TEMPERATURES, {82, 42, 62, 84, 86, 0x7F, 88, 90, 92});
+  CHECK(component.target_temperature == 21 && component.current_temperature == 22);
+  CHECK(outside.state == 1 && supply.state == 11 && returning.state == 22);
+  CHECK(exiting.state == 23 && ewt.state == 24 && reheating.state == 25 && hood.state == 26);
+  decode(RES_GET_TEMPERATURES, {80, 0, 0, 0, 0, 0, 0, 0, 0});
+  CHECK(outside.state == 1 && returning.state == 22);  // Presence mask gates updates.
+
+  sensor::Sensor return_level, supply_level, ventilation;
+  binary_sensor::BinarySensor supply_active;
+  component.return_air_level = &return_level;
+  component.supply_air_level = &supply_level;
+  component.ventilation_level = &ventilation;
+  component.supply_fan_active = &supply_active;
+  comfoair::ComfoAirNumber fan_numbers[8];
+  component.return_air_level_absent = &fan_numbers[0];
+  component.return_air_level_low = &fan_numbers[1];
+  component.return_air_level_medium = &fan_numbers[2];
+  component.return_air_level_high = &fan_numbers[3];
+  component.supply_air_level_absent = &fan_numbers[4];
+  component.supply_air_level_low = &fan_numbers[5];
+  component.supply_air_level_medium = &fan_numbers[6];
+  component.supply_air_level_high = &fan_numbers[7];
+  decode(RES_GET_VENTILATION_LEVEL, {15, 35, 50, 16, 36, 51, 40, 41, 2, 1, 70, 71});
+  CHECK(return_level.state == 40 && supply_level.state == 41 && ventilation.state == 1);
+  CHECK(supply_active.state && component.fan_mode == climate::CLIMATE_FAN_LOW);
+  const int expected_numbers[] = {15, 35, 50, 70, 16, 36, 51, 71};
+  for (int i = 0; i < 8; ++i) CHECK(fan_numbers[i].state == expected_numbers[i]);
+  const climate::ClimateFanMode modes[] = {climate::CLIMATE_FAN_AUTO, climate::CLIMATE_FAN_OFF,
+      climate::CLIMATE_FAN_LOW, climate::CLIMATE_FAN_MEDIUM, climate::CLIMATE_FAN_HIGH};
+  for (uint8_t level = 0; level < 5; ++level) {
+    decode(RES_GET_VENTILATION_LEVEL, {15, 35, 50, 15, 35, 50, 35, 35, level, 1, 70, 70});
+    CHECK(component.fan_mode == modes[level]);
+    CHECK(component.mode == (level == 1 ? climate::CLIMATE_MODE_OFF : climate::CLIMATE_MODE_FAN_ONLY));
+    uart.output.clear();
+    auto call = component.make_call();
+    call.set_fan_mode(modes[level]);
+    component.control(call);
+    CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_LEVEL, 1,
+          level, uint8_t(0xAD + CMD_SET_LEVEL + 1 + level), 7, 0x0F}));
+  }
+  uart.output.clear();
+  auto call = component.make_call();
+  call.set_target_temperature(21.5f);
+  component.control(call);
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_COMFORT_TEMPERATURE, 1,
+        83, uint8_t(0xAD + CMD_SET_COMFORT_TEMPERATURE + 1 + 83), 7, 0x0F}));
+  uart.output.clear();
+  component.set_level(-1);
+  component.set_level(5);
+  component.set_comfort_temperature(11.5f);
+  component.set_comfort_temperature(29.5f);
+  CHECK(uart.output.empty());
+
+  text_sensor::TextSensor filter, type, size, valve, frost_level;
+  binary_sensor::BinarySensor full, preheat_active, frost_active, preheat_present, bypass_present;
+  binary_sensor::BinarySensor fireplace, kitchen, postheat, pwm, p10, p17, p18, p90, p97;
+  component.filter_status = &filter;
+  component.filter_status_full = &full;
+  decode(RES_GET_FAULTS, {0, 0, 0, 0, 0, 0, 0, 0, 1});
+  CHECK(filter.state == "Full" && full.state);
+  decode(RES_GET_FAULTS, {0, 0, 0, 0, 0, 0, 0, 0, 2});
+  CHECK(filter.state == "Unknown" && full.state);
+  decode(RES_GET_FAULTS, {0, 0, 0, 0, 0, 0, 0, 0, 0});
+  CHECK(filter.state == "Ok" && !full.state);
+  component.type = &type;
+  component.size = &size;
+  component.preheating_present = &preheat_present;
+  component.bypass_present = &bypass_present;
+  component.fireplace_present = &fireplace;
+  component.kitchen_hood_present = &kitchen;
+  component.postheating_present = &postheat;
+  component.postheating_pwm_mode_present = &pwm;
+  component.p10_active = &p10;
+  component.p17_active = &p17;
+  component.p18_active = &p18;
+  component.p90_active = &p90;
+  component.p97_active = &p97;
+  decode(RES_GET_STATUS, {1, 1, 1, 1, 0x47, 0, 0x81, 1, 0x81, 0, 0});
+  CHECK(type.state == "Left");
+  CHECK(preheat_present.state && bypass_present.state && fireplace.state);
+  CHECK(kitchen.state && postheat.state && pwm.state);
+  CHECK(p10.state && p17.state && p18.state && p90.state && p97.state);
+  decode(RES_GET_STATUS, {0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0});
+  CHECK(type.state == "Right" && !p10.state && !p97.state && !fireplace.state);
+
+  sensor::Sensor hours[8];
+  component.level0_hours = &hours[0]; component.level1_hours = &hours[1];
+  component.level2_hours = &hours[2]; component.level3_hours = &hours[3];
+  component.frost_protection_hours = &hours[4]; component.preheating_hours = &hours[5];
+  component.bypass_open_hours = &hours[6]; component.filter_hours = &hours[7];
+  decode(RES_GET_OPERATION_HOURS, {1, 2, 3, 0, 0, 4, 0, 1, 0, 1, 2, 2, 3, 3, 4, 4, 5, 2, 3, 4});
+  const int expected_hours[] = {66051, 4, 256, 131844, 258, 515, 772, 1029};
+  for (int i = 0; i < 8; ++i) CHECK(hours[i].state == expected_hours[i]);
+  sensor::Sensor minutes;
+  component.preheating_valve = &valve;
+  component.preheating_active = &preheat_active;
+  component.frost_protection_active = &frost_active;
+  component.frost_protection_level = &frost_level;
+  component.frost_protection_minutes = &minutes;
+  decode(RES_GET_PREHEATING_STATUS, {1, 1, 1, 1, 2, 2});
+  CHECK(valve.state == "Open" && preheat_active.state && frost_active.state);
+  CHECK(minutes.state == 258 && frost_level.state == "NominalProtection");
+  decode(RES_GET_PREHEATING_STATUS, {2, 0, 2, 0, 0, 99});
+  CHECK(valve.state == "Unknown" && preheat_active.state && !frost_active.state);
+  CHECK(frost_level.state == "Unknown");
+  sensor::Sensor delays[8];
+  component.bathroom_switch_on_delay_minutes = &delays[0];
+  component.bathroom_switch_off_delay_minutes = &delays[1];
+  component.l1_switch_off_delay_minutes = &delays[2];
+  component.boost_ventilation_minutes = &delays[3];
+  component.filter_warning_weeks = &delays[4];
+  component.rf_high_time_short_minutes = &delays[5];
+  component.rf_high_time_long_minutes = &delays[6];
+  component.extractor_hood_switch_off_delay_minutes = &delays[7];
+  decode(RES_GET_TIME_DELAY, {1, 2, 3, 4, 5, 6, 7, 8});
+  for (int i = 0; i < 8; ++i) CHECK(delays[i].state == i + 1);
+}
 
 inline void run_protocol_tests() {
   using namespace esphome::comfoair;
@@ -122,7 +310,8 @@ inline void run_protocol_tests() {
     if (bytes == frame) CHECK(uart.output == std::vector<uint8_t>({7, 0xF3}));
     else CHECK(uart.output.empty());
   }
-  std::puts("ComfoAir protocol tests passed");
+  run_decoder_tests();
+  std::puts("ComfoAir protocol and decoder tests passed");
 }
 
 #undef CHECK
