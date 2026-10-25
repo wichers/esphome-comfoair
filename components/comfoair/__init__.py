@@ -262,7 +262,7 @@ comfoair_sensors_schemas = cv.Schema(
         cv.Optional(CONF_FILTER_STATUS): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_FROST_PROTECTION_LEVEL): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_PREHEATING_VALVE): text_sensor.text_sensor_schema(),
-        cv.Optional(CONF_SIZE_SELECT, default={}): select.select_schema(
+        cv.Optional(CONF_SIZE_SELECT): select.select_schema(
             ComfoAirSizeSelect
         ).extend(),
 
