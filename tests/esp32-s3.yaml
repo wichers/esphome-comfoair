@@ -1,0 +1,40 @@
+esphome:
+  name: comfoair-test-s3
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+logger:
+  baud_rate: 0
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [comfoair]
+uart:
+  id: uart_bus
+  tx_pin: GPIO43
+  rx_pin: GPIO44
+  baud_rate: 9600
+comfoair:
+  id: comfoair_id
+  name: ComfoAir
+  uart_id: uart_bus
+  size_select:
+    name: Unit size
+  outside_air_temperature:
+    name: Outside temperature
+  intake_fan_speed_rpm:
+    name: Intake RPM
+  preheating_active:
+    name: Preheating
+  filter_status_full:
+    name: Filter full
+  type:
+    name: Unit type
+  return_air_level_low:
+    name: Low return air
+  supply_air_level_high:
+    name: High supply air
+  sync_fan_levels:
+    name: Sync fan levels

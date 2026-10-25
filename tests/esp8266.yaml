@@ -1,0 +1,31 @@
+esphome:
+  name: comfoair-test-8266
+esp8266:
+  board: esp01_1m
+logger:
+  baud_rate: 0
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [comfoair]
+uart:
+  id: uart_bus
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 9600
+comfoair:
+  name: ComfoAir
+  uart_id: uart_bus
+  size_select:
+    name: Unit size
+  outside_air_temperature:
+    name: Outside temperature
+  preheating_active:
+    name: Preheating
+  type:
+    name: Unit type
+  return_air_level_low:
+    name: Low return air
+  sync_fan_levels:
+    name: Sync fan levels

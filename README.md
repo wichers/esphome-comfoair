@@ -222,6 +222,25 @@ The sensor defined here is a full list of sensors - if you remove a sensor from 
 For visualization:
 Checkout https://github.com/wichers/lovelace-comfoair and follow the instructions.
 
+## ESPHome compatibility and development
+
+Configuration tests target ESPHome **2026.8.1** and **2026.10.0**. The firmware
+CI matrix covers ESP32-S3 with ESP-IDF, ESP32 with ESP-IDF and Arduino, and
+ESP8266. These pins define the regression baseline, not a claim that older
+versions cannot work. Other releases are not guaranteed by this matrix.
+
+The component requires a dedicated bidirectional UART at **9600 baud, 8 data
+bits, no parity, 1 stop bit (8N1)**. ESPHome validates these settings before
+compilation. Previously, incorrect settings only produced a runtime warning;
+configurations with wrong settings or missing RX/TX pins now fail validation.
+
+`size_select` is optional. Omit it when no installer-size control is wanted;
+existing explicitly named or ID-only selects remain supported.
+
+See [test instructions](tests/README.md) and
+[maintenance priorities](doc/maintenance.md). No physical device is required
+for the configuration and native protocol tests.
+
 ## Support my work
 Thank you for thinking about supporting my work.
 

@@ -177,7 +177,6 @@ public:
     {
       ESP_LOGCONFIG(TAG, "  CC-Luxe v%0d.%02d", *(p + 13) >> 4, *(p + 13) & 0x0f);
     }
-    check_uart_settings(9600);
   }
 
   void update() override
@@ -294,7 +293,7 @@ public:
         parseRxMessage_(caRxBuffer_au8);
         break;
       case RX_STATUS_RECEIVED_INVALID_MESSAGE:
-        ESP_LOGW(TAG, "RX: Invalid checksum (from CA350).");
+        ESP_LOGW(TAG, "RX: Invalid message (checksum, length or payload limit; from CA350).");
         break;
       case RX_STATUS_RECEIVED_START_OF_MESSAGE:
       case RX_STATUS_WRAPPED_BUFFER_INDEX:

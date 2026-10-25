@@ -1,0 +1,7 @@
+packages:
+  representative: !include esp32.yaml
+esphome:
+  name: comfoair-test-arduino
+esp32:
+  framework:
+    type: arduino

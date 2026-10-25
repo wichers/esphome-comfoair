@@ -1,0 +1,20 @@
+esphome:
+  name: comfoair-minimal
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [comfoair]
+uart:
+  id: uart_bus
+  tx_pin: GPIO43
+  rx_pin: GPIO44
+  baud_rate: 9600
+comfoair:
+  id: comfoair_id
+  name: ComfoAir
+  uart_id: uart_bus
