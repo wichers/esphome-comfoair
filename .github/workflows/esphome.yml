@@ -1,0 +1,52 @@
+name: ESPHome
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        esphome: ["2026.8.1", "2026.10.0"]
+        config: [esp32-s3, esp32, esp32-arduino, esp8266, minimal]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "esphome==${{ matrix.esphome }}"
+      - run: python -m unittest discover -s tests -v
+      - run: esphome config tests/${{ matrix.config }}.yaml
+      - name: Compile without deprecated API usage
+        shell: bash
+        run: |
+          set -o pipefail
+          esphome compile tests/${{ matrix.config }}.yaml 2>&1 | tee build.log
+          if grep -E 'check_uart_settings.*deprecated' build.log; then
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: build-${{ matrix.esphome }}-${{ matrix.config }}
+          path: build.log
+
+  protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install esphome==2026.10.0
+      - run: esphome compile tests/protocol.yaml
+      - working-directory: tests/.esphome/build/comfoair-protocol
+        run: .pioenvs/comfoair-protocol/program

@@ -12,7 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ConfigTests(unittest.TestCase):
+    """Validate optional entities and the UART contract."""
+
     def run_config(self, *, uart=None, select=None, generate=False):
+        """Run an isolated config, optionally returning its generated C++."""
         config = yaml.safe_load((ROOT / "tests/minimal.yaml").read_text())
         config["external_components"][0]["source"]["path"] = str(ROOT / "components")
         if uart:
@@ -28,18 +31,23 @@ class ConfigTests(unittest.TestCase):
             path.write_text(yaml.safe_dump(config))
             command = [sys.executable, "-m", "esphome"]
             command += ["compile", "--only-generate"] if generate else ["config"]
-            result = subprocess.run(command + [str(path)], capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                command + [str(path)], capture_output=True, text=True, check=False
+            )
             generated = ""
             if generate and result.returncode == 0:
-                generated = (Path(directory) / ".esphome/build/comfoair-minimal/src/main.cpp").read_text()
+                source = Path(directory) / ".esphome/build/comfoair-minimal/src/main.cpp"
+                generated = source.read_text()
             return result, generated
 
     def test_minimal_without_size_select(self):
+        """Issue #97: an omitted select must not create an entity."""
         result, generated = self.run_config(generate=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("set_size_select", generated)
 
     def test_explicit_size_select(self):
+        """Existing named and ID-only selects still generate code."""
         for select in ({"name": "Unit size"}, {"id": "unit_size"}):
             with self.subTest(select=select):
                 result, generated = self.run_config(select=select, generate=True)
@@ -47,6 +55,7 @@ class ConfigTests(unittest.TestCase):
                 self.assertIn("set_size_select", generated)
 
     def test_invalid_uart(self):
+        """Invalid UART settings fail before compilation with useful errors."""
         cases = [
             ({"baud_rate": 19200}, "requires baud rate 9600"),
             ({"data_bits": 7}, "requires 8 data bits"),

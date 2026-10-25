@@ -1,0 +1,9 @@
+packages:
+  representative: !include esp32-s3.yaml
+esphome:
+  name: comfoair-test-esp32
+esp32:
+  board: wemos_d1_mini32
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
