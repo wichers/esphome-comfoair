@@ -212,15 +212,13 @@ public:
   void update() override
   {
     // Do not start ESP polls while the display owns the unit bus or has a
-    // command waiting.
-    if (this->has_proxy_uart_ && (this->proxy_msg_pending_ || this->bus_owner_ != BusOwner::IDLE))
+    // command waiting, or while queued control commands wait for the bus.
+    if (this->has_proxy_uart_ &&
+        (this->proxy_msg_pending_ || this->bus_owner_ != BusOwner::IDLE || this->queued_command_count_ != 0))
     {
       return;
     }
-    // Stay quiet briefly after a frame is mirrored so a poll does not land in
-    // the middle of a multi-frame display refresh.
-    if (this->has_proxy_uart_ && this->last_display_frame_ != 0 &&
-        (millis() - this->last_display_frame_) < DISPLAY_QUIET_MS)
+    if (this->in_display_quiet_window_())
     {
       return;
     }
@@ -334,6 +332,7 @@ public:
         this->caRxIdx_u8 = 0;
       }
       this->flush_pending_proxy_command_();
+      this->flush_queued_commands_();
       this->service_rx_(this->uart_proxy_, this->proxy_rx_buffer_, &this->proxy_rx_idx_, true);
     }
 
@@ -375,7 +374,7 @@ protected:
   {
     uint8_t reset_cmd[CMD_RESET_AND_SELF_TEST_LENGTH] = {errors ? (uint8_t)1 : (uint8_t)0, 0, 0,
                                                          filters ? (uint8_t)1 : (uint8_t)0};
-    write_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
+    send_control_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
   }
 
   void set_level_(int level)
@@ -389,7 +388,7 @@ protected:
     ESP_LOGI(TAG, "Setting level to: %i", level);
     {
       uint8_t command[CMD_SET_LEVEL_LENGTH] = {(uint8_t)level};
-      write_command_(CMD_SET_LEVEL, command, sizeof(command));
+      send_control_command_(CMD_SET_LEVEL, command, sizeof(command));
     }
   }
 
@@ -404,7 +403,7 @@ protected:
     ESP_LOGI(TAG, "Setting temperature to: %.1f", temperature);
     {
       uint8_t command[CMD_SET_COMFORT_TEMPERATURE_LENGTH] = {(uint8_t)((temperature + 20.0f) * 2.0f)};
-      write_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
+      send_control_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
     }
   }
 
@@ -430,7 +429,7 @@ protected:
     data[8] = 0x00;
 
     ESP_LOGD(TAG, "Setting fan speed percentages");
-    write_command_(CMD_SET_VENTILATION_LEVEL, data, sizeof(data));
+    send_control_command_(CMD_SET_VENTILATION_LEVEL, data, sizeof(data));
   }
 
   // --- TX functions ---
@@ -1463,6 +1462,85 @@ protected:
 
   static const uint32_t BUS_TRANSACTION_TIMEOUT_MS = 500;
   static const uint32_t DISPLAY_QUIET_MS = 250;
+  static const uint8_t MAX_QUEUED_COMMANDS = 4;
+  static const uint8_t MAX_QUEUED_COMMAND_DATA = CMD_SET_VENTILATION_LEVEL_LENGTH;
+  static const uint32_t QUEUED_COMMAND_TIMEOUT_MS = 5000;
+
+  struct QueuedCommand
+  {
+    uint8_t command;
+    uint8_t length;
+    uint8_t data[MAX_QUEUED_COMMAND_DATA];
+    uint32_t queued_at;
+  };
+
+  // Control commands (level, temperature, resets, fan levels, unit size) must
+  // not get lost while the display owns the bus. Send them now when possible,
+  // or queue them for loop(). Returns false when the command is rejected.
+  bool send_control_command_(uint8_t command, const uint8_t *data, uint8_t length)
+  {
+    if (this->queued_command_count_ == 0 && !this->in_display_quiet_window_() &&
+        this->write_command_(command, data, length))
+      return true;
+    if (!this->has_proxy_uart_ || length > MAX_QUEUED_COMMAND_DATA)
+      return false;
+    for (uint8_t i = 0; i < this->queued_command_count_; i++)
+    {
+      QueuedCommand &queued = this->queued_commands_[i];
+      if (queued.command != command)
+        continue;
+      // A newer value replaces a queued one. Filter and error reset share the
+      // command, so a reset only replaces an identical reset.
+      const bool same_payload = queued.length == length && memcmp(queued.data, data, length) == 0;
+      if (command != CMD_RESET_AND_SELF_TEST || same_payload)
+      {
+        queued.length = length;
+        memcpy(queued.data, data, length);
+        queued.queued_at = millis();
+        ESP_LOGD(TAG, "Unit bus busy, replaced queued command 0x%02X", command);
+        return true;
+      }
+    }
+    if (this->queued_command_count_ >= MAX_QUEUED_COMMANDS)
+    {
+      ESP_LOGW(TAG, "Unit bus busy and command queue full, rejecting command 0x%02X", command);
+      return false;
+    }
+    QueuedCommand &queued = this->queued_commands_[this->queued_command_count_++];
+    queued.command = command;
+    queued.length = length;
+    memcpy(queued.data, data, length);
+    queued.queued_at = millis();
+    ESP_LOGD(TAG, "Unit bus busy, queued command 0x%02X", command);
+    return true;
+  }
+
+  // Stay quiet briefly after a frame is mirrored, so ESP commands do not land
+  // in a multi-frame display refresh or before the display's ACK.
+  bool in_display_quiet_window_() const
+  {
+    return this->has_proxy_uart_ && this->last_display_frame_ != 0 &&
+           (millis() - this->last_display_frame_) < DISPLAY_QUIET_MS;
+  }
+
+  // Send the oldest queued command when the bus is free, one per transaction.
+  void flush_queued_commands_()
+  {
+    while (this->queued_command_count_ != 0)
+    {
+      const QueuedCommand &next = this->queued_commands_[0];
+      const bool expired = (millis() - next.queued_at) > QUEUED_COMMAND_TIMEOUT_MS;
+      if (expired)
+        ESP_LOGW(TAG, "Unit bus busy for too long, dropping command 0x%02X", next.command);
+      else if (this->in_display_quiet_window_() || !this->write_command_(next.command, next.data, next.length))
+        return;
+      this->queued_command_count_--;
+      memmove(&this->queued_commands_[0], &this->queued_commands_[1],
+              this->queued_command_count_ * sizeof(QueuedCommand));
+      if (!expired)
+        return;
+    }
+  }
 
   bool try_acquire_bus_(BusOwner who)
   {
@@ -1592,6 +1670,8 @@ protected:
   uint32_t bus_busy_since_{0};
   uint32_t last_unit_rx_{0};
   uint32_t last_display_frame_{0};
+  QueuedCommand queued_commands_[MAX_QUEUED_COMMANDS]{};
+  uint8_t queued_command_count_{0};
   uart::UARTDevice uart_proxy_;
   int8_t update_counter_{-10};
   uint8_t status_payload_[8]{0};
@@ -2019,7 +2099,11 @@ inline bool ComfoAirComponent::set_unit_size(uint8_t raw_size)
   payload[3] = raw_size;
 
   ESP_LOGI(TAG, "Setting unit size to %s", unit_size_text_label_(raw_size));
-  write_command_(CMD_SET_STATUS, payload, sizeof(payload));
+  if (!send_control_command_(CMD_SET_STATUS, payload, sizeof(payload)))
+  {
+    publish_size_entities_(current_unit_size_);
+    return false;
+  }
 
   status_payload_[3] = raw_size;
   publish_size_entities_(raw_size);

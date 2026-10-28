@@ -52,6 +52,10 @@ class TestComfoAir : public esphome::comfoair::ComfoAirComponent {
   using ComfoAirComponent::bus_busy_since_;
   using ComfoAirComponent::caRxIdx_u8;
   using ComfoAirComponent::last_unit_rx_;
+  using ComfoAirComponent::last_display_frame_;
+  using ComfoAirComponent::queued_command_count_;
+  using ComfoAirComponent::queued_commands_;
+  using ComfoAirComponent::send_control_command_;
   using ComfoAirComponent::last_command_sent_;
   using ComfoAirComponent::update_counter_;
 };
@@ -112,6 +116,97 @@ inline void run_proxy_tests() {
   component.set_level(3);
   CHECK(unit.output == set_level_frame(3));
   receive(unit, {7, 0xF3});
+
+  // Wire frames with checksum and escaping, from a component without proxy.
+  auto frame_of = [](uint8_t command, const std::vector<uint8_t> &payload) {
+    TestUART out;
+    TestComfoAir encoder;
+    encoder.set_uart_parent(&out);
+    encoder.write_command_(command, payload.data(), payload.size());
+    return out.output;
+  };
+  const auto display_poll = frame_of(CMD_GET_VENTILATION_LEVEL, {});
+  const auto unit_reply = frame_of(RES_GET_VENTILATION_LEVEL, {15, 35, 50, 15, 35, 50, 35, 35, 2, 1, 70, 70});
+  // The display polls, the unit replies to the display, and the display ACKs.
+  auto display_transaction = [&]() {
+    unit.output.clear();
+    display.output.clear();
+    receive(display, display_poll);
+    CHECK(unit.output == display_poll && component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
+    unit.output.clear();
+    receive(unit, unit_reply);
+    CHECK(unit.output.empty() && display.output == unit_reply);  // The display ACKs, not the ESP.
+    CHECK(component.bus_owner_ == TestComfoAir::BusOwner::IDLE);
+    receive(display, {7, 0xF3});
+    CHECK(unit.output == std::vector<uint8_t>({7, 0xF3}));
+  };
+  auto after_quiet_window = [&]() {
+    component.last_display_frame_ = esphome::millis() - 300;
+    unit.output.clear();
+    component.loop();
+    return unit.output;
+  };
+
+  // A climate request while the display owns the bus is queued, not dropped.
+  receive(display, display_poll);
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
+  unit.output.clear();
+  auto high = component.make_call();
+  high.set_fan_mode(climate::CLIMATE_FAN_HIGH);
+  component.control(high);
+  CHECK(unit.output.empty() && component.queued_command_count_ == 1);
+  receive(unit, unit_reply);
+  receive(display, {7, 0xF3});
+  // Polls wait for queued commands. The command waits for the quiet window.
+  unit.output.clear();
+  component.update_counter_ = 3;
+  component.update();
+  component.loop();
+  CHECK(unit.output.empty() && component.update_counter_ == 3);
+  CHECK(after_quiet_window() == set_level_frame(4));
+  CHECK(component.queued_command_count_ == 0 && component.bus_owner_ == TestComfoAir::BusOwner::ESP);
+  receive(unit, {7, 0xF3});
+  CHECK(display.output == unit_reply);  // The ACK to the ESP is not mirrored.
+
+  // Queued commands go out in order, one per transaction. A newer level
+  // replaces a queued level. The two resets stay separate, and the queue is bounded.
+  receive(display, display_poll);
+  component.set_level(1);
+  component.set_level(2);
+  component.set_comfort_temperature(21.5f);
+  component.reset_filters();
+  component.reset_errors();
+  component.reset_errors();
+  CHECK(component.queued_command_count_ == 4);
+  const uint8_t extra[] = {0};
+  CHECK(!component.send_control_command_(0x9F, extra, sizeof(extra)));
+  receive(unit, unit_reply);
+  receive(display, {7, 0xF3});
+  const std::vector<std::vector<uint8_t>> expected = {
+      set_level_frame(2),
+      frame_of(CMD_SET_COMFORT_TEMPERATURE, {83}),
+      frame_of(CMD_RESET_AND_SELF_TEST, {0, 0, 0, 1}),
+      frame_of(CMD_RESET_AND_SELF_TEST, {1, 0, 0, 0}),
+  };
+  for (const auto &frame : expected) {
+    CHECK(after_quiet_window() == frame);
+    component.loop();
+    CHECK(unit.output == frame);  // Nothing more until the ACK.
+    receive(unit, {7, 0xF3});
+  }
+  CHECK(component.queued_command_count_ == 0 && after_quiet_window().empty());
+
+  // A command that waits too long is dropped with a warning.
+  receive(display, display_poll);
+  component.set_level(0);
+  CHECK(component.queued_command_count_ == 1);
+  component.queued_commands_[0].queued_at = esphome::millis() - 6000;
+  receive(unit, unit_reply);
+  receive(display, {7, 0xF3});
+  CHECK(after_quiet_window().empty() && component.queued_command_count_ == 0);
+
+  // A full display transaction still works after all of this.
+  display_transaction();
 }
 
 // Synthetic fixtures based on registers.h; these are not captured unit traffic.

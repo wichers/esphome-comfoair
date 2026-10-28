@@ -42,6 +42,13 @@ and without the optional bytes. A valid frame with a short fault payload goes
 through the receive loop and must not change any state. The tests also check
 the two reset-button payloads and that `error_status` alone polls the faults.
 
+Proxy tests use a second fake UART for the display. They cover forwarding of
+display commands and unit replies, which side sends each ACK, poll slots that
+advance or wait, recovery from a truncated unit frame after the timeout, and
+the control-command queue: order, replacement, the size limit, the timeout,
+and the quiet window after a display frame. The config tests reject a proxy
+UART with wrong settings or the same UART as the unit.
+
 The host harness targets ESPHome 2026.10.0's UART C++ API. Configuration and
 firmware CI separately target 2026.8.1 and 2026.10.0, covering ESP32-S3/ESP-IDF,
 ESP32/ESP-IDF, ESP32/Arduino, ESP8266, and an entity-minimal configuration.
