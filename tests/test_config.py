@@ -102,6 +102,18 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(validated[key]["max_value"], 95)
             self.assertEqual(validated[key]["step"], 1)
             self.assertEqual(validated[key]["unit_of_measurement"], "%")
+        # Home Assistant has no device class for these values. A wrong class
+        # gives a warning and, for volume, a unit conversion.
+        units = {
+            "intake_fan_speed": "%", "exhaust_fan_speed": "%",
+            "intake_fan_speed_rpm": "RPM", "exhaust_fan_speed_rpm": "RPM",
+            "return_air_level": "%", "supply_air_level": "%", "bypass_valve": "%",
+            "bypass_factor": None, "bypass_step": None, "bypass_correction": None,
+        }
+        for key, unit in units.items():
+            with self.subTest(sensor=key):
+                self.assertFalse(validated[key].get("device_class"))
+                self.assertEqual(validated[key].get("unit_of_measurement"), unit)
 
     def test_invalid_uart(self):
         """Invalid UART settings fail before compilation with useful errors."""

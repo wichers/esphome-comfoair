@@ -13,7 +13,8 @@ tests/.esphome/build/comfoair-protocol/.pioenvs/comfoair-protocol/program
 The Python tests invoke the real ESPHome CLI in temporary directories. They
 cover issue #97 (no implicit size select), explicit name/ID-only selects,
 code generation for all 87 optional component entities, fan-number defaults,
-and rejection of each invalid UART setting or missing pin.
+the units of the fan and bypass sensors without a device class, and rejection
+of each invalid UART setting or missing pin.
 
 `protocol.yaml` builds a native host executable using the actual component and
 ESPHome classes, not a reimplementation of the parser. A fake UART captures TX
