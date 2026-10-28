@@ -914,6 +914,12 @@ protected:
     }
     case RES_GET_FAULTS:
     {
+      // Bytes 0..8 (A/E errors and filter) are required. EA (byte 9) and high A (byte 13) are optional.
+      if (msg_length_u8 < 9)
+      {
+        ESP_LOGW(TAG, "Ignoring fault response with %u data bytes, need at least 9", msg_length_u8);
+        break;
+      }
       const uint8_t status = msg_data[8];
       if (filter_status != nullptr)
       {
