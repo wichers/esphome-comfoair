@@ -49,7 +49,9 @@ class TestComfoAir : public esphome::comfoair::ComfoAirComponent {
   using ComfoAirComponent::connector_board_version_;
   using ComfoAirComponent::BusOwner;
   using ComfoAirComponent::bus_owner_;
+  using ComfoAirComponent::bus_busy_since_;
   using ComfoAirComponent::caRxIdx_u8;
+  using ComfoAirComponent::last_unit_rx_;
   using ComfoAirComponent::last_command_sent_;
   using ComfoAirComponent::update_counter_;
 };
@@ -78,6 +80,38 @@ inline void run_proxy_tests() {
   component.update();
   CHECK(unit.output == poll_level && component.update_counter_ == 4);
   CHECK(component.bus_owner_ == TestComfoAir::BusOwner::ESP);
+
+  auto set_level_frame = [](uint8_t level) {
+    return std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_LEVEL, 1, level,
+        uint8_t(0xAD + CMD_SET_LEVEL + 1 + level), 7, 0x0F});
+  };
+  auto receive = [&](TestUART &from, const std::vector<uint8_t> &bytes) {
+    from.input.assign(bytes.begin(), bytes.end());
+    component.loop();
+  };
+
+  // A truncated reply and the transaction timeout must not block the bus.
+  receive(unit, {7, 0xF0, 0});
+  CHECK(component.caRxIdx_u8 != 0);
+  component.bus_busy_since_ = esphome::millis() - 600;
+  component.loop();
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::IDLE && component.caRxIdx_u8 == 0);
+  unit.output.clear();
+  component.set_level(2);
+  CHECK(unit.output == set_level_frame(2));
+  receive(unit, {7, 0xF3});
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::IDLE && display.output.empty());
+
+  // The same for a truncated frame while the bus is idle.
+  receive(unit, {7, 0xF0, 0});
+  CHECK(component.caRxIdx_u8 != 0);
+  component.last_unit_rx_ = esphome::millis() - 600;
+  component.loop();
+  CHECK(component.caRxIdx_u8 == 0);
+  unit.output.clear();
+  component.set_level(3);
+  CHECK(unit.output == set_level_frame(3));
+  receive(unit, {7, 0xF3});
 }
 
 // Synthetic fixtures based on registers.h; these are not captured unit traffic.

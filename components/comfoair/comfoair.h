@@ -319,10 +319,19 @@ public:
 
     if (this->has_proxy_uart_)
     {
+      // A partial unit frame blocks the bus (see try_acquire_bus_), so drop it
+      // when the transaction times out or when the unit stops sending mid-frame.
       if (this->bus_owner_ != BusOwner::IDLE && (millis() - this->bus_busy_since_) > BUS_TRANSACTION_TIMEOUT_MS)
       {
         ESP_LOGW(TAG, "Unit bus transaction timeout (owner=%u), releasing", static_cast<unsigned>(this->bus_owner_));
+        this->caRxIdx_u8 = 0;
         this->release_bus_();
+      }
+      else if (this->bus_owner_ == BusOwner::IDLE && this->caRxIdx_u8 != 0 &&
+               (millis() - this->last_unit_rx_) > BUS_TRANSACTION_TIMEOUT_MS)
+      {
+        ESP_LOGW(TAG, "Dropping incomplete unit frame (%u bytes)", this->caRxIdx_u8);
+        this->caRxIdx_u8 = 0;
       }
       this->flush_pending_proxy_command_();
       this->service_rx_(this->uart_proxy_, this->proxy_rx_buffer_, &this->proxy_rx_idx_, true);
@@ -1501,6 +1510,8 @@ protected:
         break;
       uint8_t rx_byte_u8;
       src.read_byte(&rx_byte_u8);
+      if (!from_display)
+        this->last_unit_rx_ = millis();
       switch (this->checkRx_(buf, idx, rx_byte_u8))
       {
       case RX_STATUS_RECEIVED_ACK:
@@ -1579,6 +1590,7 @@ protected:
   bool last_command_sent_{true};
   BusOwner bus_owner_{BusOwner::IDLE};
   uint32_t bus_busy_since_{0};
+  uint32_t last_unit_rx_{0};
   uint32_t last_display_frame_{0};
   uart::UARTDevice uart_proxy_;
   int8_t update_counter_{-10};
