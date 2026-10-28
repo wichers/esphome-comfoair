@@ -226,6 +226,9 @@ public:
     }
 
     ESP_LOGD(TAG, "Component update: %d", update_counter_);
+    // A slot without configured entities sends nothing and must still advance.
+    // Only a send that fails in this update keeps the slot for the next update.
+    this->last_command_sent_ = true;
     switch (update_counter_)
     {
     case -4:

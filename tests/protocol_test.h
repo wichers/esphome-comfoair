@@ -47,8 +47,38 @@ class TestComfoAir : public esphome::comfoair::ComfoAirComponent {
   using ComfoAirComponent::bootloader_version_;
   using ComfoAirComponent::firmware_version_;
   using ComfoAirComponent::connector_board_version_;
+  using ComfoAirComponent::BusOwner;
+  using ComfoAirComponent::bus_owner_;
+  using ComfoAirComponent::caRxIdx_u8;
+  using ComfoAirComponent::last_command_sent_;
   using ComfoAirComponent::update_counter_;
 };
+
+// Display proxy: the unit is on uart, the ComfoSense display on display.
+inline void run_proxy_tests() {
+  using namespace esphome;
+  TestUART unit, display;
+  TestComfoAir component;
+  component.set_uart_parent(&unit);
+  component.set_proxy_uart_component(&display);
+  const std::vector<uint8_t> poll_level = {7, 0xF0, 0, CMD_GET_VENTILATION_LEVEL, 0,
+      uint8_t(0xAD + CMD_GET_VENTILATION_LEVEL), 7, 0x0F};
+
+  // A poll that cannot be sent keeps its slot. A slot without entities still
+  // advances, also after an earlier failed send.
+  component.caRxIdx_u8 = 3;  // The unit is sending a frame.
+  component.update_counter_ = 3;
+  component.update();
+  CHECK(unit.output.empty() && component.update_counter_ == 3 && !component.last_command_sent_);
+  component.caRxIdx_u8 = 0;
+  component.update_counter_ = 0;  // Fan status, but no fan entities.
+  component.update();
+  CHECK(unit.output.empty() && component.update_counter_ == 1);
+  component.update_counter_ = 3;
+  component.update();
+  CHECK(unit.output == poll_level && component.update_counter_ == 4);
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::ESP);
+}
 
 // Synthetic fixtures based on registers.h; these are not captured unit traffic.
 inline void run_decoder_tests() {
@@ -384,6 +414,7 @@ inline void run_protocol_tests() {
     else CHECK(uart.output.empty());
   }
   run_decoder_tests();
+  run_proxy_tests();
   std::puts("ComfoAir protocol and decoder tests passed");
 }
 
