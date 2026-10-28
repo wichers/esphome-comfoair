@@ -219,6 +219,8 @@ The sensor defined here is a full list of sensors - if you remove a sensor from 
 
 > **Warning:** The `size_select` entity exposes the ComfoAir unit size (large/small) for installer configuration. Changing this setting should be done sparingly and only when you know the correct unit size for your installation.
 
+> **Note:** `ventilation_level` is numeric: Auto = -1, Absent = 0, Low = 1, Medium = 2, High = 3. Earlier versions reported 0 for both Auto and Absent. If an automation compares `ventilation_level` with 0 to detect Auto, change it to -1.
+
 For visualization:
 Checkout https://github.com/wichers/lovelace-comfoair and follow the instructions.
 
