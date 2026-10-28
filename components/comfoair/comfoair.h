@@ -1516,7 +1516,8 @@ protected:
   }
 
   // Stay quiet briefly after a frame is mirrored, so ESP commands do not land
-  // in a multi-frame display refresh or before the display's ACK.
+  // between the unit's ACK and its reply, or before the display's ACK. The
+  // display's ACK ends the window (see forward_display_ack_).
   bool in_display_quiet_window_() const
   {
     return this->has_proxy_uart_ && this->last_display_frame_ != 0 &&
@@ -1562,6 +1563,14 @@ protected:
     dst.flush();
   }
 
+  // The display ACKs the unit's reply, so its transaction is complete. A display
+  // polls again at once, so do not keep the quiet window open after this.
+  void forward_display_ack_()
+  {
+    this->send_ack_to_(*this);
+    this->last_display_frame_ = 0;
+  }
+
   void flush_pending_proxy_command_()
   {
     if (!this->proxy_msg_pending_)
@@ -1570,7 +1579,7 @@ protected:
     {
       if (this->bus_owner_ != BusOwner::IDLE || this->caRxIdx_u8 != 0)
         return;
-      this->send_ack_to_(*this);
+      this->forward_display_ack_();
       this->proxy_msg_pending_ = false;
       return;
     }
@@ -1596,7 +1605,7 @@ protected:
         if (from_display)
         {
           if (this->bus_owner_ == BusOwner::IDLE && this->caRxIdx_u8 == 0)
-            this->send_ack_to_(*this);
+            this->forward_display_ack_();
           else
           {
             this->proxy_pending_is_ack_ = true;
@@ -1619,6 +1628,9 @@ protected:
         {
           memcpy(this->pending_proxy_msg_, buf, MAX_MESSAGE_SIZE);
           this->proxy_pending_is_ack_ = false;
+          // A queued control command goes first. Otherwise a display that polls
+          // without a pause keeps the bus until the command expires.
+          this->flush_queued_commands_();
           if (this->try_acquire_bus_(BusOwner::PROXY))
           {
             this->txMessageTo_(*this, this->pending_proxy_msg_);

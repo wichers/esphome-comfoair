@@ -46,7 +46,8 @@ Proxy tests use a second fake UART for the display. They cover forwarding of
 display commands and unit replies, which side sends each ACK, poll slots that
 advance or wait, recovery from a truncated unit frame after the timeout, and
 the control-command queue: order, replacement, the size limit, the timeout,
-and the quiet window after a display frame. The config tests reject a proxy
+the quiet window after a display frame, and priority over a display that polls
+again at once after its ACK. The config tests reject a proxy
 UART with wrong settings or the same UART as the unit.
 
 The host harness targets ESPHome 2026.10.0's UART C++ API. Configuration and

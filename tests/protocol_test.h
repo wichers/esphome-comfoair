@@ -155,18 +155,30 @@ inline void run_proxy_tests() {
   high.set_fan_mode(climate::CLIMATE_FAN_HIGH);
   component.control(high);
   CHECK(unit.output.empty() && component.queued_command_count_ == 1);
+  // The command waits for the unit's reply and the display's ACK. Polls wait
+  // for queued commands.
   receive(unit, unit_reply);
-  receive(display, {7, 0xF3});
-  // Polls wait for queued commands. The command waits for the quiet window.
-  unit.output.clear();
+  component.loop();
   component.update_counter_ = 3;
   component.update();
-  component.loop();
   CHECK(unit.output.empty() && component.update_counter_ == 3);
-  CHECK(after_quiet_window() == set_level_frame(4));
+  // A display that polls again at once must not starve the queue: the ESP
+  // command goes first, and the display poll waits for its ACK.
+  display.output.clear();
+  std::vector<uint8_t> ack_and_poll = {7, 0xF3};
+  ack_and_poll.insert(ack_and_poll.end(), display_poll.begin(), display_poll.end());
+  receive(display, ack_and_poll);
+  std::vector<uint8_t> ack_and_level = {7, 0xF3};
+  const auto level_high = set_level_frame(4);
+  ack_and_level.insert(ack_and_level.end(), level_high.begin(), level_high.end());
+  CHECK(unit.output == ack_and_level);
   CHECK(component.queued_command_count_ == 0 && component.bus_owner_ == TestComfoAir::BusOwner::ESP);
+  unit.output.clear();
   receive(unit, {7, 0xF3});
-  CHECK(display.output == unit_reply);  // The ACK to the ESP is not mirrored.
+  CHECK(display.output.empty());  // The ACK to the ESP is not mirrored.
+  CHECK(unit.output == display_poll && component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
+  receive(unit, unit_reply);
+  receive(display, {7, 0xF3});
 
   // Queued commands go out in order, one per transaction. A newer level
   // replaces a queued level. The two resets stay separate, and the queue is bounded.
