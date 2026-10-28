@@ -569,15 +569,34 @@ CONFIG_SCHEMA = (
     .extend(comfoair_sensors_schemas)
 )
 
-FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
-    "comfoair",
-    baud_rate=9600,
-    require_rx=True,
-    require_tx=True,
-    data_bits=8,
-    parity="NONE",
-    stop_bits=1,
+UART_SETTINGS = {
+    "baud_rate": 9600,
+    "require_rx": True,
+    "require_tx": True,
+    "data_bits": 8,
+    "parity": "NONE",
+    "stop_bits": 1,
+}
+validate_unit_uart = uart.final_validate_device_schema("comfoair", **UART_SETTINGS)
+validate_proxy_uart = uart.final_validate_device_schema(
+    "comfoair proxy_uart", uart_bus=CONF_PROXY_UART_ID, **UART_SETTINGS
 )
+
+
+def final_validate(config):
+    """The unit UART and the optional display UART need 9600 8N1 and must differ."""
+    validate_unit_uart(config)
+    if CONF_PROXY_UART_ID in config:
+        if config[CONF_PROXY_UART_ID] == config[CONF_UART_ID]:
+            raise cv.Invalid(
+                f"{CONF_PROXY_UART_ID} must use a different UART than {CONF_UART_ID}",
+                path=[CONF_PROXY_UART_ID],
+            )
+        validate_proxy_uart(config)
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = cv.All(final_validate)
 
 
 async def to_code(config):

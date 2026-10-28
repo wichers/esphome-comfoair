@@ -17,7 +17,25 @@ helper_comfoair = import_module("components.comfoair").helper_comfoair
 class ConfigTests(unittest.TestCase):
     """Validate optional entities and the UART contract."""
 
-    def run_config(self, *, uart=None, select=None, entities=None, generate=False):
+    @staticmethod
+    def add_proxy(config, proxy):
+        """Add a second UART (uart_proxy) and set proxy_uart.
+
+        None values in proxy remove keys. The key "use" sets proxy_uart directly.
+        """
+        proxy_uart = {"id": "uart_proxy", "tx_pin": "GPIO17", "rx_pin": "GPIO18",
+                      "baud_rate": 9600}
+        for key, value in proxy.items():
+            if key == "use":
+                continue
+            if value is None:
+                proxy_uart.pop(key, None)
+            else:
+                proxy_uart[key] = value
+        config["uart"] = [config["uart"], proxy_uart]
+        config["comfoair"]["proxy_uart"] = proxy.get("use", "uart_proxy")
+
+    def run_config(self, *, uart=None, proxy=None, select=None, entities=None, generate=False):
         """Run an isolated config, optionally returning its generated C++."""
         config = yaml.safe_load((ROOT / "tests/minimal.yaml").read_text())
         config["external_components"][0]["source"]["path"] = str(ROOT / "components")
@@ -27,6 +45,8 @@ class ConfigTests(unittest.TestCase):
                     config["uart"].pop(key, None)
                 else:
                     config["uart"][key] = value
+        if proxy is not None:
+            self.add_proxy(config, proxy)
         if select is not None:
             config["comfoair"]["size_select"] = select
         if entities:
@@ -99,6 +119,32 @@ class ConfigTests(unittest.TestCase):
                 result, _ = self.run_config(uart=uart)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(message, result.stdout + result.stderr)
+
+    def test_proxy_uart(self):
+        """A valid second UART generates the proxy setter."""
+        result, generated = self.run_config(proxy={}, generate=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("set_proxy_uart_component(", generated)
+
+    def test_invalid_proxy_uart(self):
+        """The display UART needs 9600 8N1 with RX and TX, on its own UART."""
+        cases = [
+            ({"baud_rate": 115200}, "requires baud rate 9600"),
+            ({"data_bits": 7}, "requires 8 data bits"),
+            ({"parity": "EVEN"}, "requires parity NONE"),
+            ({"stop_bits": 2}, "requires 1 stop bits"),
+            ({"rx_pin": None}, "declare a rx_pin"),
+            ({"tx_pin": None}, "declare a tx_pin"),
+            ({"use": "uart_bus"}, "proxy_uart must use a different UART than uart_id"),
+        ]
+        for proxy, message in cases:
+            with self.subTest(proxy=proxy):
+                result, _ = self.run_config(proxy=proxy)
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, output)
+                if "use" not in proxy:
+                    self.assertIn("comfoair proxy_uart", output)
 
 
 if __name__ == "__main__":
