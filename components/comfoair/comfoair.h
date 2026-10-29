@@ -830,9 +830,10 @@ protected:
         supply_air_level->publish_state(msg_data[7]);
       }
 
+      // Byte from command 0x99 minus 1: Auto=-1, Absent=0, Low=1, Medium=2, High=3.
       if (ventilation_level != nullptr)
       {
-        ventilation_level->publish_state(msg_data[8] == 0 ? 0 : msg_data[8] - 1);
+        ventilation_level->publish_state(static_cast<int>(msg_data[8]) - 1);
       }
 
       // Fan Speed

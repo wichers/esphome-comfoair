@@ -145,6 +145,7 @@ inline void run_decoder_tests() {
       climate::CLIMATE_FAN_LOW, climate::CLIMATE_FAN_MEDIUM, climate::CLIMATE_FAN_HIGH};
   for (uint8_t level = 0; level < 5; ++level) {
     decode(RES_GET_VENTILATION_LEVEL, {15, 35, 50, 15, 35, 50, 35, 35, level, 1, 70, 70});
+    CHECK(ventilation.state == static_cast<int>(level) - 1);
     CHECK(component.fan_mode == modes[level]);
     CHECK(component.mode == (level == 1 ? climate::CLIMATE_MODE_OFF : climate::CLIMATE_MODE_FAN_ONLY));
     uart.output.clear();
