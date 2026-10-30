@@ -34,6 +34,10 @@ It is not published until the release workflow succeeds on merged `master`.
 
 ### User actions
 
+Development tooling: Pylint is pinned to 4.0.9, which fixes the stats-cache pickle
+deserialization advisory reported by Dependabot. Reinstall `requirements-dev.txt`
+when linting locally; this dependency is not included in device firmware.
+
 - Move installation sources to `ref: v1.0.0` after publication; use `refresh: never`
   for immutable tags. Updating source does not flash a device automatically.
 - Replace placeholders in `secrets.example.yaml` with unique credentials. Web
