@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without v; must match VERSION
+        required: true
+        default: "1.0.0"
+        type: string
+      hardware_verified:
+        description: I completed the documented device and display-proxy smoke checks
+        required: true
+        default: false
+        type: boolean
+      hardware_notes:
+        description: Tested models/firmware and smoke-test results or evidence link (no secrets)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Require merged master, consistent metadata and hardware evidence
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          HARDWARE_VERIFIED: ${{ inputs.hardware_verified }}
+          HARDWARE_NOTES: ${{ inputs.hardware_notes }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/master
+          test "$HARDWARE_VERIFIED" = true
+          test -n "$HARDWARE_NOTES"
+          python .github/scripts/check_release.py "$REQUESTED_VERSION"
+
+  checks:
+    needs: prepare
+    uses: ./.github/workflows/esphome.yml
+
+  publish:
+    needs: [prepare, checks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Publish a new immutable version from the checked commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          HARDWARE_NOTES: ${{ inputs.hardware_notes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha)"
+          if [[ "$latest_sha" != "$GITHUB_SHA" ]]; then
+            echo "Master changed during validation; rerun Release on the latest master." >&2
+            exit 1
+          fi
+          tag="v$RELEASE_VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "Tag $tag already exists; published tags must not be moved." >&2
+            exit 1
+          else
+            result=$?
+            if [[ "$result" != 2 ]]; then exit "$result"; fi
+          fi
+          printf '\n## Hardware validation\n\n%s\n' "$HARDWARE_NOTES" >> RELEASE_NOTES.md
+          gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes-file RELEASE_NOTES.md

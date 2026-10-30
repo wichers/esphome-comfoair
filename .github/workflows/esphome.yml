@@ -5,12 +5,51 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+  schedule:
+    - cron: "17 6 * * 1"
 
 permissions:
   contents: read
 
+concurrency:
+  group: esphome-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
 jobs:
+  lint:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pylint components tests .github/scripts
+      - run: python -m ruff check components tests .github/scripts
+
+  configuration:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        esphome: ["2026.8.1", "2026.10.0"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install "esphome==${{ matrix.esphome }}"
+      - run: python -m unittest discover -s tests -v
+
   firmware:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -22,8 +61,17 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.platformio
+            tests/.esphome
+          key: ${{ runner.os }}-firmware-${{ matrix.esphome }}-${{ matrix.config }}-${{ hashFiles('components/**', 'tests/*.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-firmware-${{ matrix.esphome }}-${{ matrix.config }}-
       - run: python -m pip install "esphome==${{ matrix.esphome }}"
-      - run: python -m unittest discover -s tests -v
       - run: esphome config tests/${{ matrix.config }}.yaml
       - name: Compile without deprecated API usage
         shell: bash
@@ -38,15 +86,35 @@ jobs:
         with:
           name: build-${{ matrix.esphome }}-${{ matrix.config }}
           path: build.log
+          retention-days: 14
 
   protocol:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
       - run: python -m pip install esphome==2026.10.0
       - run: esphome compile tests/protocol.yaml
       - working-directory: tests/.esphome/build/comfoair-protocol
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: halt_on_error=1
         run: .pioenvs/comfoair-protocol/program
+
+  latest-stable:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      # Deliberately unpinned: detect compatibility breaks in new ESPHome releases.
+      - run: python -m pip install --upgrade esphome
+      - run: python -m unittest discover -s tests -v
+      - run: esphome compile tests/esp32-s3.yaml
