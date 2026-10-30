@@ -23,22 +23,29 @@ metadata. For untagged development builds also record the Git commit.
 3. Test the merged commit using the installation's own YAML with a local source.
    Confirm the board, flash/PSRAM, UART pins, network target and secrets before
    any upload. Record model/firmware, entity identities and baseline readings;
-   then perform a passive 90-second check after reboot. Verify communication
-   status/response age and recovery after a controlled serial disconnect when
-   physically safe. Do not operate installer/reset controls as a smoke test.
-4. Separately verify a real second-UART wall controller: display updates and
-   ordinary fan-mode changes from both sides, ACK/reply order, timeout recovery,
-   and no lost commands. Record model/firmware and relative serial timestamps.
-   Synthetic fixtures do not replace this evidence.
+   then observe multiple complete polling cycles after reboot. Aim for a
+   90-second capture and record its actual duration. Do not operate installer/reset
+   controls as a smoke test. Record communication status/response age and any
+   automation-driven control commands. Mark a serial-disconnect recovery test as
+   unverified unless it was actually performed and recovery was observed.
+4. Track wall-controller validation separately: display updates and ordinary
+   fan-mode changes from both sides, ACK/reply order, timeout recovery, and lost
+   commands. Record model/firmware and relative serial timestamps if tested.
+   Software fixtures do not establish hardware verification. A direct-UART
+   release may proceed with proxy/recovery/installer scenarios explicitly marked
+   hardware-unverified in the public release notes.
 5. From Actions → Release, select **master**, enter the version, confirm the
-   hardware checks and provide concise evidence. The workflow validates metadata,
+   evidence review and provide the actual hardware results plus a separate list
+   of unverified scenarios. The workflow validates metadata,
    reruns the full baseline CI and latest-stable check, verifies master has not
    advanced, and creates the tag and release using `gh` only if all checks pass.
    Existing tags are rejected. No universal binary is uploaded.
 
 The workflow does not publish on PR merge, tag push or schedule. A manual
 dispatch is the deliberate publication step. There is no release before the
-required PRs merge and the hardware check is completed.
+required PRs merge and the recorded hardware evidence and limits are reviewed.
+The confirmation attests the accuracy of the evidence; it does not attest that
+every scenario has been tested. Never mark an unperformed test as verified.
 
 ## Installation and rollback
 
