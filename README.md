@@ -32,7 +32,14 @@ every 20 seconds.
 
 Ready-to-adapt MQTT/web-server examples are included for `esp32-s3-devkitc-1`
 and `wemos_d1_mini32` boards. They intentionally leave the Home Assistant
-native API disabled.
+native API disabled. Copy `secrets.example.yaml` to `secrets.yaml` and replace
+every placeholder with installation-specific values. Generate an API encryption
+key with `openssl rand -base64 32` when using the native API examples.
+
+Installation examples target **v1.0.0**. Use them after that release is published;
+for development use a local component source as shown in `tests/`. A tag selects
+component source, not a universal firmware image: board, pins, flash/PSRAM and
+credentials must match your hardware.
 
 Add the following definition of `external_components` to your yaml configuration:
 
@@ -41,6 +48,8 @@ external_components:
   - source:
       type: git
       url: https://github.com/wichers/esphome-comfoair
+      ref: v1.0.0
+    refresh: never
     components: [comfoair]
 ```
 and then use it:
@@ -65,8 +74,6 @@ comfoair:
     name: "type"
   size:
     name: "size"
-  size_select:
-    name: "unit_size"
   intake_fan_speed:
     name: "intake_fan_speed"
   exhaust_fan_speed:
@@ -224,7 +231,25 @@ comfoair:
 
 The sensor defined here is a full list of sensors - if you remove a sensor from the yaml definition it will not be monitored.
 
-> **Warning:** The `size_select` entity exposes the ComfoAir unit size (large/small) for installer configuration. Changing this setting should be done sparingly and only when you know the correct unit size for your installation.
+The climate fan mode **Off** selects **Absent**. Fans can still run at their
+configured absent percentages. It does not electrically stop the unit.
+
+Installer-size and fan-tuning controls are opt-in. Read
+[controls and communication health](doc/controls.md) before enabling them.
+The examples include `connected` and `response_age` diagnostics; gate automations
+on serial communication status rather than ESP network availability alone.
+
+To expose the installer-size select explicitly:
+
+```yaml
+# Under comfoair:
+size_select:
+  name: Unit size
+```
+
+It is disabled by default in Home Assistant. Enable it only when the correct
+unit size is known. Fan-percentage controls likewise start from device readings;
+the formerly ignored `initial_value` option is no longer accepted.
 
 > **Note:** `ventilation_level` is numeric: Auto = -1, Absent = 0, Low = 1, Medium = 2, High = 3. Earlier versions reported 0 for both Auto and Absent. If an automation compares `ventilation_level` with 0 to detect Auto, change it to -1.
 
@@ -246,7 +271,8 @@ configurations with wrong settings or missing RX/TX pins now fail validation.
 `size_select` is optional. Omit it when no installer-size control is wanted;
 existing explicitly named or ID-only selects remain supported.
 
-See [test instructions](tests/README.md) and
+See [test instructions](tests/README.md), [contribution instructions](CONTRIBUTING.md),
+[release process](doc/releases.md), [changelog](CHANGELOG.md), and
 [maintenance priorities](doc/maintenance.md). No physical device is required
 for the configuration and native protocol tests.
 

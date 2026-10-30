@@ -15,7 +15,7 @@ esphome:
   area: lab #livingroom
   project:
     name: "wichers.comfoair" # author_name.project_name
-    version: "1.1.0"
+    version: "1.0.0"
   # debug_scheduler: false
   # on_boot:
   # on_loop:
@@ -35,6 +35,8 @@ external_components:
   - source:
       type: git
       url: https://github.com/wichers/esphome-comfoair
+      ref: v1.0.0
+    refresh: never
     components: [comfoair]
 
 # ----- Communication connections (wifi, webserver, HomeAssistent-api, mqtt) -----
@@ -63,9 +65,9 @@ web_server:
   ota: false
   local: true
   version: 3
-  # auth:
-  #   username: !secret web_server_username
-  #   password: !secret web_server_password
+  auth:
+    username: !secret web_server_username
+    password: !secret web_server_password
   sorting_groups:
     - id: sorting_group_temperatures
       name: "Comfo Actual Temperatures"
@@ -127,8 +129,7 @@ mqtt:
 # <https://esphome.io/components/logger>
 logger:
   # baud_rate: 115200 # serial UART baud_rate. 0 = disable logging via UART
-  level: VERY_VERBOSE # VERY_VERBOSE, VERBOSE, DEBUG, INFO, WARN, ERROR, NONE
-  initial_level: INFO
+  level: INFO
 
 # ### Over-the-Air Updates ###
 # <https://esphome.io/components/ota/>
@@ -261,16 +262,16 @@ comfoair:
   id: comfoair_climate
   name: "${node_name}"
   uart_id: uart_bus
+  connected:
+    name: Ventilation communication
+  response_age:
+    name: Ventilation response age
   type:
     name: "Type" # left
     web_server:
       sorting_group_id: sorting_group_setup
   size:
     name: "Size" # small
-    web_server:
-      sorting_group_id: sorting_group_setup
-  size_select:
-    name: "Size (unit_size)"
     web_server:
       sorting_group_id: sorting_group_setup
   intake_fan_speed:

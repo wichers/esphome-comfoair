@@ -30,25 +30,23 @@ API references:
 - [UART component architecture](https://developers.esphome.io/architecture/components/uart/)
 - [UART Python API source](https://github.com/esphome/esphome/blob/2026.10.0/esphome/components/uart/__init__.py)
 
-## Follow-up work (not mixed into the fixes)
+## Current priorities
 
-| Priority | Improvement | Risk / verification needed |
-| --- | --- | --- |
-| P1 | Run the new GitHub CI matrix before merging | Local success does not establish Linux runner/toolchain compatibility. Version pins need maintenance. |
-| P2 | Supplement synthetic decoder fixtures with captured traffic | Every dispatch branch is exercised, but synthetic samples do not prove every hardware/firmware variant. |
-| P2 | Longer-term runtime and Home Assistant UI observation | The real OTA smoke test uses the native API and passive polling; it does not operate physical controls or establish long-term uptime. |
+- Run all PR checks before merging and keep the supported ESPHome pins current.
+- Validate v1.0.0 on an actual unit and a separate wall-controller installation.
+  Record model/firmware, serial timing, entity identities and passive readings.
+- Supplement synthetic fixtures with annotated captured traffic; no captured
+  fixtures have been supplied yet. See CONTRIBUTING.md for the evidence format.
+- Observe longer-term operation and Home Assistant/MQTT availability behavior.
+- Ask the reporters of issues #40 and #54 to verify tagged fan/proxy behavior
+  before closing those reports; do not assume every hardware variant is fixed.
 
-The standard UART validator already identifies the component, required setting
-and referenced UART. Custom validation/error wrappers would duplicate ESPHome
-behavior and are not needed.
+## Historical implementation notes
 
-## Open pull requests checked before implementation
+The following PRs were separate from the original UART-validation work and have
+since merged: #94 (Auto ventilation and zero fan-period handling), #95 (fault bits
+and reset buttons), #96 (second-UART display proxy), and #100 (sensor metadata).
+Their earlier exclusion is historical, not the current support status.
 
-- #96: optional second UART/ComfoSense proxy; intentionally excluded. It modifies
-  the same Python and C++ files, so rebasing and rerunning protocol tests is
-  necessary if it merges.
-- #95: fault bits and reset buttons; separate features, overlapping files.
-- #94: Auto ventilation level and zero fan-period handling; separate C++ fix.
-
-No remote branches or pull requests are created by these local commits, and no
-open PR is merged or modified.
+See controls.md for confirmed controls, tuning safeguards and communication
+health, and releases.md for the v1.0.0 release gate and ongoing versioning.
