@@ -38,6 +38,8 @@ API references:
 - Supplement synthetic fixtures with annotated captured traffic; no captured
   fixtures have been supplied yet. See CONTRIBUTING.md for the evidence format.
 - Observe longer-term operation and Home Assistant/MQTT availability behavior.
+- See [recorded hardware evidence](hardware.md) for the ComfoAir 350 test and its
+  remaining limits, including the untested display proxy and disconnect recovery.
 - Ask the reporters of issues #40 and #54 to verify tagged fan/proxy behavior
   before closing those reports; do not assume every hardware variant is fixed.
 

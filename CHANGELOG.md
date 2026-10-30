@@ -19,6 +19,8 @@ It is not published until the release workflow succeeds on merged `master`.
 - Polling when only motor-current sensors are configured.
 - Fan/bypass units and device classes, including the previously merged PR #100.
 - Motor-current values are identified as raw ADC counts, not amperes.
+- An absent enthalpy temperature sensor reports unavailable instead of -20°C.
+  Presence value 2 (exchanger without sensor) is also handled.
 
 ### Added
 

@@ -913,7 +913,9 @@ protected:
     {
       if (enthalpy_temperature != nullptr)
       {
-        enthalpy_temperature->publish_state((float)msg_data[0] / 2.0f - 20.0f);
+        // Status 2 is an enthalpy exchanger without a temperature sensor.
+        enthalpy_temperature->publish_state(
+            status_payload_valid_ && status_payload_[6] == 1 ? (float)msg_data[0] / 2.0f - 20.0f : NAN);
       }
       break;
     }
@@ -1213,6 +1215,10 @@ protected:
       if (enthalpy_present != nullptr)
       {
         enthalpy_present->publish_state(msg_data[9]);
+      }
+      if (enthalpy_temperature != nullptr && msg_data[9] != 1)
+      {
+        enthalpy_temperature->publish_state(NAN);
       }
 
       if (ewt_present != nullptr)
