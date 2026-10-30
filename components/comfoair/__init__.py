@@ -54,6 +54,7 @@ DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor", "select", "number", "button"]
 REQUIRED_KEY_NAME = "name"
 CONF_HUB_ID = "comfoair"
+CONF_PROXY_UART_ID = "proxy_uart"
 
 UNIT_WEEK = "weeks"
 
@@ -561,21 +562,41 @@ CONFIG_SCHEMA = (
     climate.climate_schema(ComfoAirComponent).extend(
         {
             cv.Required(REQUIRED_KEY_NAME): cv.string,
+            cv.Optional(CONF_PROXY_UART_ID): cv.use_id(uart.UARTComponent),
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(comfoair_sensors_schemas)
 )
 
-FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
-    "comfoair",
-    baud_rate=9600,
-    require_rx=True,
-    require_tx=True,
-    data_bits=8,
-    parity="NONE",
-    stop_bits=1,
+UART_SETTINGS = {
+    "baud_rate": 9600,
+    "require_rx": True,
+    "require_tx": True,
+    "data_bits": 8,
+    "parity": "NONE",
+    "stop_bits": 1,
+}
+validate_unit_uart = uart.final_validate_device_schema("comfoair", **UART_SETTINGS)
+validate_proxy_uart = uart.final_validate_device_schema(
+    "comfoair proxy_uart", uart_bus=CONF_PROXY_UART_ID, **UART_SETTINGS
 )
+
+
+def final_validate(config):
+    """The unit UART and the optional display UART need 9600 8N1 and must differ."""
+    validate_unit_uart(config)
+    if CONF_PROXY_UART_ID in config:
+        if config[CONF_PROXY_UART_ID] == config[CONF_UART_ID]:
+            raise cv.Invalid(
+                f"{CONF_PROXY_UART_ID} must use a different UART than {CONF_UART_ID}",
+                path=[CONF_PROXY_UART_ID],
+            )
+        validate_proxy_uart(config)
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = cv.All(final_validate)
 
 
 async def to_code(config):
@@ -587,6 +608,9 @@ async def to_code(config):
     cg.add(var.set_name(config[REQUIRED_KEY_NAME]))
     paren = await cg.get_variable(config[CONF_UART_ID])
     cg.add(var.set_uart_component(paren))
+    if CONF_PROXY_UART_ID in config:
+        proxy_uart = await cg.get_variable(config[CONF_PROXY_UART_ID])
+        cg.add(var.set_proxy_uart_component(proxy_uart))
     for k, values in helper_comfoair.items():
         for v in values:
             if not v in config:

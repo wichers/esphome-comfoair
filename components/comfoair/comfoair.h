@@ -203,11 +203,30 @@ public:
     {
       ESP_LOGCONFIG(TAG, "  CC-Luxe v%0d.%02d", *(p + 13) >> 4, *(p + 13) & 0x0f);
     }
+    if (this->has_proxy_uart_)
+    {
+      ESP_LOGCONFIG(TAG, "  Display proxy UART: enabled (CCEase / ComfoSense)");
+    }
   }
 
   void update() override
   {
+    // Do not start ESP polls while the display owns the unit bus or has a
+    // command waiting, or while queued control commands wait for the bus.
+    if (this->has_proxy_uart_ &&
+        (this->proxy_msg_pending_ || this->bus_owner_ != BusOwner::IDLE || this->queued_command_count_ != 0))
+    {
+      return;
+    }
+    if (this->in_display_quiet_window_())
+    {
+      return;
+    }
+
     ESP_LOGD(TAG, "Component update: %d", update_counter_);
+    // A slot without configured entities sends nothing and must still advance.
+    // Only a send that fails in this update keeps the slot for the next update.
+    this->last_command_sent_ = true;
     switch (update_counter_)
     {
     case -4:
@@ -257,6 +276,11 @@ public:
       break;
     }
 
+    if (!this->last_command_sent_)
+    {
+      return;
+    }
+
     update_counter_++;
     if (update_counter_ > 9) // num_update_counter_elements_
     {
@@ -291,45 +315,28 @@ public:
     4. process RX data
     */
 
-    // CA350
-    // caRxSerial();       // receive ACKs and messages from CA350
-
-    while (available() != 0)
+    if (this->has_proxy_uart_)
     {
-      uint8_t rx_byte_u8;
-
-      // fetch byte for RX buffer and process it by readRx()
-      read_byte(&rx_byte_u8);
-
-      switch (checkRx_(caRxBuffer_au8, &caRxIdx_u8, rx_byte_u8))
+      // A partial unit frame blocks the bus (see try_acquire_bus_), so drop it
+      // when the transaction times out or when the unit stops sending mid-frame.
+      if (this->bus_owner_ != BusOwner::IDLE && (millis() - this->bus_busy_since_) > BUS_TRANSACTION_TIMEOUT_MS)
       {
-      case RX_STATUS_DEFAULT:
-        break;
-      case RX_STATUS_RECEIVED_ACK:
-        ESP_LOGVV(TAG, "RX: ACK");
-        // caProcessNewACK(); // do something if an ACK is received
-        break;
-      case RX_STATUS_RECEIVED_MESSAGE:
-        ESP_LOGVV(TAG, "RX: message cmd: %02X", caRxBuffer_au8[1]);
-        // acknowledge message
-        txACK_();
-        // at this point caRxBuffer_au8 consists of
-        // 2-byte command, length, data and checksum.
-        // caProcessNewData(caRxBuffer); // do something with received message
-        parseRxMessage_(caRxBuffer_au8);
-        break;
-      case RX_STATUS_RECEIVED_INVALID_MESSAGE:
-        ESP_LOGW(TAG, "RX: Invalid message (checksum, length or payload limit; from CA350).");
-        break;
-      case RX_STATUS_RECEIVED_START_OF_MESSAGE:
-      case RX_STATUS_WRAPPED_BUFFER_INDEX:
-      default:
-        break;
+        ESP_LOGW(TAG, "Unit bus transaction timeout (owner=%u), releasing", static_cast<unsigned>(this->bus_owner_));
+        this->caRxIdx_u8 = 0;
+        this->release_bus_();
       }
+      else if (this->bus_owner_ == BusOwner::IDLE && this->caRxIdx_u8 != 0 &&
+               (millis() - this->last_unit_rx_) > BUS_TRANSACTION_TIMEOUT_MS)
+      {
+        ESP_LOGW(TAG, "Dropping incomplete unit frame (%u bytes)", this->caRxIdx_u8);
+        this->caRxIdx_u8 = 0;
+      }
+      this->flush_pending_proxy_command_();
+      this->flush_queued_commands_();
+      this->service_rx_(this->uart_proxy_, this->proxy_rx_buffer_, &this->proxy_rx_idx_, true);
     }
 
-    // ComfoSense
-    // csRxSerial();       // receive ACKs and messages from ComfoSense
+    this->service_rx_(*this, this->caRxBuffer_au8, &this->caRxIdx_u8, false);
   }
 
   float get_setup_priority() const override { return setup_priority::DATA; }
@@ -349,6 +356,11 @@ public:
     name = value;
   }
   void set_uart_component(uart::UARTComponent *parent) { set_uart_parent(parent); }
+  void set_proxy_uart_component(uart::UARTComponent *proxy)
+  {
+    this->uart_proxy_.set_uart_parent(proxy);
+    this->has_proxy_uart_ = true;
+  }
   bool set_unit_size(uint8_t raw_size);
   void set_size_select(ComfoAirSizeSelect *size_select);
 
@@ -362,7 +374,7 @@ protected:
   {
     uint8_t reset_cmd[CMD_RESET_AND_SELF_TEST_LENGTH] = {errors ? (uint8_t)1 : (uint8_t)0, 0, 0,
                                                          filters ? (uint8_t)1 : (uint8_t)0};
-    write_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
+    send_control_command_(CMD_RESET_AND_SELF_TEST, reset_cmd, sizeof(reset_cmd));
   }
 
   void set_level_(int level)
@@ -376,7 +388,7 @@ protected:
     ESP_LOGI(TAG, "Setting level to: %i", level);
     {
       uint8_t command[CMD_SET_LEVEL_LENGTH] = {(uint8_t)level};
-      write_command_(CMD_SET_LEVEL, command, sizeof(command));
+      send_control_command_(CMD_SET_LEVEL, command, sizeof(command));
     }
   }
 
@@ -391,7 +403,7 @@ protected:
     ESP_LOGI(TAG, "Setting temperature to: %.1f", temperature);
     {
       uint8_t command[CMD_SET_COMFORT_TEMPERATURE_LENGTH] = {(uint8_t)((temperature + 20.0f) * 2.0f)};
-      write_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
+      send_control_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
     }
   }
 
@@ -417,18 +429,24 @@ protected:
     data[8] = 0x00;
 
     ESP_LOGD(TAG, "Setting fan speed percentages");
-    write_command_(CMD_SET_VENTILATION_LEVEL, data, sizeof(data));
+    send_control_command_(CMD_SET_VENTILATION_LEVEL, data, sizeof(data));
   }
 
   // --- TX functions ---
 
   // Build TX-array
-  void write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length)
+  bool write_command_(const uint8_t command, const uint8_t *command_data, uint8_t command_data_length)
   {
+    this->last_command_sent_ = false;
     if (command_data_length > MAX_PROTOCOL_DATA_SIZE)
     {
       ESP_LOGW(TAG, "Command 0x%02X payload is too large: %u", command, command_data_length);
-      return;
+      return false;
+    }
+    if (this->has_proxy_uart_ && !this->try_acquire_bus_(BusOwner::ESP))
+    {
+      ESP_LOGD(TAG, "Unit bus busy, deferring ESP command 0x%02X", command);
+      return false;
     }
 
     uint8_t message_au8_au8[MAX_MESSAGE_SIZE]{};
@@ -439,11 +457,15 @@ protected:
     {
       message_au8_au8[3 + idx_u8] = command_data[idx_u8];
     }
-    txMessage_(message_au8_au8);
+    this->txMessageTo_(*this, message_au8_au8);
+    this->last_command_sent_ = true;
+    return true;
   }
 
   // add prefix, second 0x07, checksum and postfix and transmit that data.
-  void txMessage_(uint8_t message_au8[] /*, tx_serial txPort_en */)
+  void txMessage_(uint8_t message_au8[] /*, tx_serial txPort_en */) { this->txMessageTo_(*this, message_au8); }
+
+  void txMessageTo_(uart::UARTDevice &dst, uint8_t message_au8[] /*, tx_serial txPort_en */)
   {
     // add 2 bytes "START"
     // copy "COMMAND" and "SIZE"
@@ -526,8 +548,8 @@ protected:
     //   break;
     // }
     idx_txBuffer_u8++;
-    write_array(txBuffer_au8, idx_txBuffer_u8);
-    flush();
+    dst.write_array(txBuffer_au8, idx_txBuffer_u8);
+    dst.flush();
   }
 
   void txACK_(/* tx_serial txPort_en */)
@@ -1431,8 +1453,238 @@ protected:
   const char *unit_size_text_label_(uint8_t raw_size) const;
   const char *unit_size_option_label_(uint8_t raw_size) const;
 
+  enum class BusOwner : uint8_t
+  {
+    IDLE = 0,
+    ESP = 1,
+    PROXY = 2,
+  };
+
+  static const uint32_t BUS_TRANSACTION_TIMEOUT_MS = 500;
+  static const uint32_t DISPLAY_QUIET_MS = 250;
+  static const uint8_t MAX_QUEUED_COMMANDS = 4;
+  static const uint8_t MAX_QUEUED_COMMAND_DATA = CMD_SET_VENTILATION_LEVEL_LENGTH;
+  static const uint32_t QUEUED_COMMAND_TIMEOUT_MS = 5000;
+
+  struct QueuedCommand
+  {
+    uint8_t command;
+    uint8_t length;
+    uint8_t data[MAX_QUEUED_COMMAND_DATA];
+    uint32_t queued_at;
+  };
+
+  // Control commands (level, temperature, resets, fan levels, unit size) must
+  // not get lost while the display owns the bus. Send them now when possible,
+  // or queue them for loop(). Returns false when the command is rejected.
+  bool send_control_command_(uint8_t command, const uint8_t *data, uint8_t length)
+  {
+    if (this->queued_command_count_ == 0 && !this->in_display_quiet_window_() &&
+        this->write_command_(command, data, length))
+      return true;
+    if (!this->has_proxy_uart_ || length > MAX_QUEUED_COMMAND_DATA)
+      return false;
+    for (uint8_t i = 0; i < this->queued_command_count_; i++)
+    {
+      QueuedCommand &queued = this->queued_commands_[i];
+      if (queued.command != command)
+        continue;
+      // A newer value replaces a queued one. Filter and error reset share the
+      // command, so a reset only replaces an identical reset.
+      const bool same_payload = queued.length == length && memcmp(queued.data, data, length) == 0;
+      if (command != CMD_RESET_AND_SELF_TEST || same_payload)
+      {
+        queued.length = length;
+        memcpy(queued.data, data, length);
+        queued.queued_at = millis();
+        ESP_LOGD(TAG, "Unit bus busy, replaced queued command 0x%02X", command);
+        return true;
+      }
+    }
+    if (this->queued_command_count_ >= MAX_QUEUED_COMMANDS)
+    {
+      ESP_LOGW(TAG, "Unit bus busy and command queue full, rejecting command 0x%02X", command);
+      return false;
+    }
+    QueuedCommand &queued = this->queued_commands_[this->queued_command_count_++];
+    queued.command = command;
+    queued.length = length;
+    memcpy(queued.data, data, length);
+    queued.queued_at = millis();
+    ESP_LOGD(TAG, "Unit bus busy, queued command 0x%02X", command);
+    return true;
+  }
+
+  // Stay quiet briefly after a frame is mirrored, so ESP commands do not land
+  // between the unit's ACK and its reply, or before the display's ACK. The
+  // display's ACK ends the window (see forward_display_ack_).
+  bool in_display_quiet_window_() const
+  {
+    return this->has_proxy_uart_ && this->last_display_frame_ != 0 &&
+           (millis() - this->last_display_frame_) < DISPLAY_QUIET_MS;
+  }
+
+  // Send the oldest queued command when the bus is free, one per transaction.
+  void flush_queued_commands_()
+  {
+    while (this->queued_command_count_ != 0)
+    {
+      const QueuedCommand &next = this->queued_commands_[0];
+      const bool expired = (millis() - next.queued_at) > QUEUED_COMMAND_TIMEOUT_MS;
+      if (expired)
+        ESP_LOGW(TAG, "Unit bus busy for too long, dropping command 0x%02X", next.command);
+      else if (this->in_display_quiet_window_() || !this->write_command_(next.command, next.data, next.length))
+        return;
+      this->queued_command_count_--;
+      memmove(&this->queued_commands_[0], &this->queued_commands_[1],
+              this->queued_command_count_ * sizeof(QueuedCommand));
+      if (!expired)
+        return;
+    }
+  }
+
+  bool try_acquire_bus_(BusOwner who)
+  {
+    if (!this->has_proxy_uart_)
+      return true;
+    if (this->bus_owner_ != BusOwner::IDLE || this->caRxIdx_u8 != 0)
+      return false;
+    this->bus_owner_ = who;
+    this->bus_busy_since_ = millis();
+    return true;
+  }
+
+  void release_bus_() { this->bus_owner_ = BusOwner::IDLE; }
+
+  void send_ack_to_(uart::UARTDevice &dst)
+  {
+    dst.write_byte(COMMAND_PREFIX);
+    dst.write_byte(COMMAND_HEAD_ACK);
+    dst.flush();
+  }
+
+  // The display ACKs the unit's reply, so its transaction is complete. A display
+  // polls again at once, so do not keep the quiet window open after this.
+  void forward_display_ack_()
+  {
+    this->send_ack_to_(*this);
+    this->last_display_frame_ = 0;
+  }
+
+  void flush_pending_proxy_command_()
+  {
+    if (!this->proxy_msg_pending_)
+      return;
+    if (this->proxy_pending_is_ack_)
+    {
+      if (this->bus_owner_ != BusOwner::IDLE || this->caRxIdx_u8 != 0)
+        return;
+      this->forward_display_ack_();
+      this->proxy_msg_pending_ = false;
+      return;
+    }
+    if (!this->try_acquire_bus_(BusOwner::PROXY))
+      return;
+    this->txMessageTo_(*this, this->pending_proxy_msg_);
+    this->proxy_msg_pending_ = false;
+  }
+
+  void service_rx_(uart::UARTDevice &src, uint8_t *buf, uint8_t *idx, bool from_display)
+  {
+    while (src.available() != 0)
+    {
+      if (from_display && this->proxy_msg_pending_)
+        break;
+      uint8_t rx_byte_u8;
+      src.read_byte(&rx_byte_u8);
+      if (!from_display)
+        this->last_unit_rx_ = millis();
+      switch (this->checkRx_(buf, idx, rx_byte_u8))
+      {
+      case RX_STATUS_RECEIVED_ACK:
+        if (from_display)
+        {
+          if (this->bus_owner_ == BusOwner::IDLE && this->caRxIdx_u8 == 0)
+            this->forward_display_ack_();
+          else
+          {
+            this->proxy_pending_is_ack_ = true;
+            this->proxy_msg_pending_ = true;
+          }
+        }
+        else
+        {
+          if (this->has_proxy_uart_ && this->bus_owner_ != BusOwner::ESP)
+          {
+            this->send_ack_to_(this->uart_proxy_);
+            this->last_display_frame_ = millis();
+          }
+          this->release_bus_();
+          this->flush_pending_proxy_command_();
+        }
+        break;
+      case RX_STATUS_RECEIVED_MESSAGE:
+        if (from_display)
+        {
+          memcpy(this->pending_proxy_msg_, buf, MAX_MESSAGE_SIZE);
+          this->proxy_pending_is_ack_ = false;
+          // A queued control command goes first. Otherwise a display that polls
+          // without a pause keeps the bus until the command expires.
+          this->flush_queued_commands_();
+          if (this->try_acquire_bus_(BusOwner::PROXY))
+          {
+            this->txMessageTo_(*this, this->pending_proxy_msg_);
+            this->proxy_msg_pending_ = false;
+          }
+          else
+          {
+            this->proxy_msg_pending_ = true;
+          }
+        }
+        else
+        {
+          if (this->bus_owner_ == BusOwner::ESP || !this->has_proxy_uart_)
+            this->txACK_();
+          this->parseRxMessage_(buf);
+          if (this->has_proxy_uart_ && this->bus_owner_ != BusOwner::ESP)
+          {
+            this->txMessageTo_(this->uart_proxy_, buf);
+            this->last_display_frame_ = millis();
+          }
+          this->release_bus_();
+          this->flush_pending_proxy_command_();
+        }
+        break;
+      case RX_STATUS_RECEIVED_INVALID_MESSAGE:
+        if (!from_display)
+        {
+          ESP_LOGW(TAG, "RX: Invalid message (checksum, length or payload limit; from CA350).");
+          this->release_bus_();
+          this->flush_pending_proxy_command_();
+        }
+        break;
+      default:
+        break;
+      }
+    }
+  }
+
   uint8_t caRxBuffer_au8[MAX_MESSAGE_SIZE]{};
   uint8_t caRxIdx_u8 = 0;
+  uint8_t proxy_rx_buffer_[MAX_MESSAGE_SIZE]{};
+  uint8_t proxy_rx_idx_{0};
+  uint8_t pending_proxy_msg_[MAX_MESSAGE_SIZE]{};
+  bool proxy_msg_pending_{false};
+  bool proxy_pending_is_ack_{false};
+  bool has_proxy_uart_{false};
+  bool last_command_sent_{true};
+  BusOwner bus_owner_{BusOwner::IDLE};
+  uint32_t bus_busy_since_{0};
+  uint32_t last_unit_rx_{0};
+  uint32_t last_display_frame_{0};
+  QueuedCommand queued_commands_[MAX_QUEUED_COMMANDS]{};
+  uint8_t queued_command_count_{0};
+  uart::UARTDevice uart_proxy_;
   int8_t update_counter_{-10};
   uint8_t status_payload_[8]{0};
   bool status_payload_valid_{false};
@@ -1859,7 +2111,11 @@ inline bool ComfoAirComponent::set_unit_size(uint8_t raw_size)
   payload[3] = raw_size;
 
   ESP_LOGI(TAG, "Setting unit size to %s", unit_size_text_label_(raw_size));
-  write_command_(CMD_SET_STATUS, payload, sizeof(payload));
+  if (!send_control_command_(CMD_SET_STATUS, payload, sizeof(payload)))
+  {
+    publish_size_entities_(current_unit_size_);
+    return false;
+  }
 
   status_payload_[3] = raw_size;
   publish_size_entities_(raw_size);

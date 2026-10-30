@@ -29,15 +29,21 @@ sensor:
 binary_sensor:
 
 uart:
-  id: uart_bus
-  baud_rate: 9600
-  tx_pin: TX
-  rx_pin: RX
+  - id: uart_bus
+    baud_rate: 9600
+    tx_pin: TX
+    rx_pin: RX
+  # Optional second UART for the original controller. Prefer an ESP32.
+  # - id: uart_proxy
+  #   baud_rate: 9600
+  #   tx_pin: GPIO4
+  #   rx_pin: GPIO5
 
 comfoair:
   name: "ComfoAir 350"
   id: "comfoair_climate"
   uart_id: uart_bus
+  # proxy_uart: uart_proxy
   type:
     name: "type"
   size:

@@ -47,8 +47,179 @@ class TestComfoAir : public esphome::comfoair::ComfoAirComponent {
   using ComfoAirComponent::bootloader_version_;
   using ComfoAirComponent::firmware_version_;
   using ComfoAirComponent::connector_board_version_;
+  using ComfoAirComponent::BusOwner;
+  using ComfoAirComponent::bus_owner_;
+  using ComfoAirComponent::bus_busy_since_;
+  using ComfoAirComponent::caRxIdx_u8;
+  using ComfoAirComponent::last_unit_rx_;
+  using ComfoAirComponent::last_display_frame_;
+  using ComfoAirComponent::queued_command_count_;
+  using ComfoAirComponent::queued_commands_;
+  using ComfoAirComponent::send_control_command_;
+  using ComfoAirComponent::last_command_sent_;
   using ComfoAirComponent::update_counter_;
 };
+
+// Display proxy: the unit is on uart, the ComfoSense display on display.
+inline void run_proxy_tests() {
+  using namespace esphome;
+  TestUART unit, display;
+  TestComfoAir component;
+  component.set_uart_parent(&unit);
+  component.set_proxy_uart_component(&display);
+  const std::vector<uint8_t> poll_level = {7, 0xF0, 0, CMD_GET_VENTILATION_LEVEL, 0,
+      uint8_t(0xAD + CMD_GET_VENTILATION_LEVEL), 7, 0x0F};
+
+  // A poll that cannot be sent keeps its slot. A slot without entities still
+  // advances, also after an earlier failed send.
+  component.caRxIdx_u8 = 3;  // The unit is sending a frame.
+  component.update_counter_ = 3;
+  component.update();
+  CHECK(unit.output.empty() && component.update_counter_ == 3 && !component.last_command_sent_);
+  component.caRxIdx_u8 = 0;
+  component.update_counter_ = 0;  // Fan status, but no fan entities.
+  component.update();
+  CHECK(unit.output.empty() && component.update_counter_ == 1);
+  component.update_counter_ = 3;
+  component.update();
+  CHECK(unit.output == poll_level && component.update_counter_ == 4);
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::ESP);
+
+  auto set_level_frame = [](uint8_t level) {
+    return std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_LEVEL, 1, level,
+        uint8_t(0xAD + CMD_SET_LEVEL + 1 + level), 7, 0x0F});
+  };
+  auto receive = [&](TestUART &from, const std::vector<uint8_t> &bytes) {
+    from.input.assign(bytes.begin(), bytes.end());
+    component.loop();
+  };
+
+  // A truncated reply and the transaction timeout must not block the bus.
+  receive(unit, {7, 0xF0, 0});
+  CHECK(component.caRxIdx_u8 != 0);
+  component.bus_busy_since_ = esphome::millis() - 600;
+  component.loop();
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::IDLE && component.caRxIdx_u8 == 0);
+  unit.output.clear();
+  component.set_level(2);
+  CHECK(unit.output == set_level_frame(2));
+  receive(unit, {7, 0xF3});
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::IDLE && display.output.empty());
+
+  // The same for a truncated frame while the bus is idle.
+  receive(unit, {7, 0xF0, 0});
+  CHECK(component.caRxIdx_u8 != 0);
+  component.last_unit_rx_ = esphome::millis() - 600;
+  component.loop();
+  CHECK(component.caRxIdx_u8 == 0);
+  unit.output.clear();
+  component.set_level(3);
+  CHECK(unit.output == set_level_frame(3));
+  receive(unit, {7, 0xF3});
+
+  // Wire frames with checksum and escaping, from a component without proxy.
+  auto frame_of = [](uint8_t command, const std::vector<uint8_t> &payload) {
+    TestUART out;
+    TestComfoAir encoder;
+    encoder.set_uart_parent(&out);
+    encoder.write_command_(command, payload.data(), payload.size());
+    return out.output;
+  };
+  const auto display_poll = frame_of(CMD_GET_VENTILATION_LEVEL, {});
+  const auto unit_reply = frame_of(RES_GET_VENTILATION_LEVEL, {15, 35, 50, 15, 35, 50, 35, 35, 2, 1, 70, 70});
+  // The display polls, the unit replies to the display, and the display ACKs.
+  auto display_transaction = [&]() {
+    unit.output.clear();
+    display.output.clear();
+    receive(display, display_poll);
+    CHECK(unit.output == display_poll && component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
+    unit.output.clear();
+    receive(unit, unit_reply);
+    CHECK(unit.output.empty() && display.output == unit_reply);  // The display ACKs, not the ESP.
+    CHECK(component.bus_owner_ == TestComfoAir::BusOwner::IDLE);
+    receive(display, {7, 0xF3});
+    CHECK(unit.output == std::vector<uint8_t>({7, 0xF3}));
+  };
+  auto after_quiet_window = [&]() {
+    component.last_display_frame_ = esphome::millis() - 300;
+    unit.output.clear();
+    component.loop();
+    return unit.output;
+  };
+
+  // A climate request while the display owns the bus is queued, not dropped.
+  receive(display, display_poll);
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
+  unit.output.clear();
+  auto high = component.make_call();
+  high.set_fan_mode(climate::CLIMATE_FAN_HIGH);
+  component.control(high);
+  CHECK(unit.output.empty() && component.queued_command_count_ == 1);
+  // The command waits for the unit's reply and the display's ACK. Polls wait
+  // for queued commands.
+  receive(unit, unit_reply);
+  component.loop();
+  component.update_counter_ = 3;
+  component.update();
+  CHECK(unit.output.empty() && component.update_counter_ == 3);
+  // A display that polls again at once must not starve the queue: the ESP
+  // command goes first, and the display poll waits for its ACK.
+  display.output.clear();
+  std::vector<uint8_t> ack_and_poll = {7, 0xF3};
+  ack_and_poll.insert(ack_and_poll.end(), display_poll.begin(), display_poll.end());
+  receive(display, ack_and_poll);
+  std::vector<uint8_t> ack_and_level = {7, 0xF3};
+  const auto level_high = set_level_frame(4);
+  ack_and_level.insert(ack_and_level.end(), level_high.begin(), level_high.end());
+  CHECK(unit.output == ack_and_level);
+  CHECK(component.queued_command_count_ == 0 && component.bus_owner_ == TestComfoAir::BusOwner::ESP);
+  unit.output.clear();
+  receive(unit, {7, 0xF3});
+  CHECK(display.output.empty());  // The ACK to the ESP is not mirrored.
+  CHECK(unit.output == display_poll && component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
+  receive(unit, unit_reply);
+  receive(display, {7, 0xF3});
+
+  // Queued commands go out in order, one per transaction. A newer level
+  // replaces a queued level. The two resets stay separate, and the queue is bounded.
+  receive(display, display_poll);
+  component.set_level(1);
+  component.set_level(2);
+  component.set_comfort_temperature(21.5f);
+  component.reset_filters();
+  component.reset_errors();
+  component.reset_errors();
+  CHECK(component.queued_command_count_ == 4);
+  const uint8_t extra[] = {0};
+  CHECK(!component.send_control_command_(0x9F, extra, sizeof(extra)));
+  receive(unit, unit_reply);
+  receive(display, {7, 0xF3});
+  const std::vector<std::vector<uint8_t>> expected = {
+      set_level_frame(2),
+      frame_of(CMD_SET_COMFORT_TEMPERATURE, {83}),
+      frame_of(CMD_RESET_AND_SELF_TEST, {0, 0, 0, 1}),
+      frame_of(CMD_RESET_AND_SELF_TEST, {1, 0, 0, 0}),
+  };
+  for (const auto &frame : expected) {
+    CHECK(after_quiet_window() == frame);
+    component.loop();
+    CHECK(unit.output == frame);  // Nothing more until the ACK.
+    receive(unit, {7, 0xF3});
+  }
+  CHECK(component.queued_command_count_ == 0 && after_quiet_window().empty());
+
+  // A command that waits too long is dropped with a warning.
+  receive(display, display_poll);
+  component.set_level(0);
+  CHECK(component.queued_command_count_ == 1);
+  component.queued_commands_[0].queued_at = esphome::millis() - 6000;
+  receive(unit, unit_reply);
+  receive(display, {7, 0xF3});
+  CHECK(after_quiet_window().empty() && component.queued_command_count_ == 0);
+
+  // A full display transaction still works after all of this.
+  display_transaction();
+}
 
 // Synthetic fixtures based on registers.h; these are not captured unit traffic.
 inline void run_decoder_tests() {
@@ -384,6 +555,7 @@ inline void run_protocol_tests() {
     else CHECK(uart.output.empty());
   }
   run_decoder_tests();
+  run_proxy_tests();
   std::puts("ComfoAir protocol and decoder tests passed");
 }
 
