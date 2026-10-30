@@ -12,7 +12,7 @@ tests/.esphome/build/comfoair-protocol/.pioenvs/comfoair-protocol/program
 
 The Python tests invoke the real ESPHome CLI in temporary directories. They
 cover issue #97 (no implicit size select), explicit name/ID-only selects,
-code generation for all 87 optional component entities, fan-number defaults,
+code generation for all optional component entities, fan-number limits,
 the units of the fan and bypass sensors without a device class, and rejection
 of each invalid UART setting or missing pin.
 
@@ -30,6 +30,8 @@ Protocol coverage:
 - Repeated buffer wraps, index bounds, and guard bytes around the RX buffer.
 - Incoming ACKs, ACK transmission for valid messages, and no ACK for invalid
   or incomplete messages or incoming ACKs.
+- Every byte following an escaped prefix, including escaped STOP/START/ACK
+  sequences, and every shorter-than-required payload length for each decoder.
 
 Decoder fixtures exercise every response dispatch branch: version data, fans
 (including zero-period RPM), valves, bypass control, both temperature formats,
@@ -50,6 +52,12 @@ the control-command queue: order, replacement, the size limit, the timeout,
 the quiet window after a display frame, and priority over a display that polls
 again at once after its ACK. The config tests reject a proxy
 UART with wrong settings or the same UART as the unit.
+
+Read requests retain ownership across intermediate ACKs until their matching
+reply. Control tests cover a climate without optional temperature sensors,
+fan edits before/after a complete baseline with only one number exposed,
+device-confirmed unit size, communication timeout/recovery, and motor-current-only
+polling. Invalid numeric commands are rejected before encoding.
 
 The host harness targets ESPHome 2026.10.0's UART C++ API. Configuration and
 firmware CI separately target 2026.8.1 and 2026.10.0, covering ESP32-S3/ESP-IDF,

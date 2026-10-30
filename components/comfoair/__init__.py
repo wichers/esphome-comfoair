@@ -14,24 +14,24 @@ from esphome.components import (
 )
 from esphome.const import (
     CONF_DISABLED_BY_DEFAULT,
-    CONF_ICON,
     CONF_ID,
-    CONF_INITIAL_VALUE,
     CONF_MAX_VALUE,
     CONF_MIN_VALUE,
     CONF_STEP,
     CONF_UART_ID,
-    DEVICE_CLASS_CURRENT,
+    DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_EMPTY,
     DEVICE_CLASS_TEMPERATURE,
+    ENTITY_CATEGORY_CONFIG,
+    ENTITY_CATEGORY_DIAGNOSTIC,
     ICON_FAN,
     STATE_CLASS_MEASUREMENT,
-    UNIT_AMPERE,
     UNIT_CELSIUS,
     UNIT_HOUR,
     UNIT_MINUTE,
     UNIT_PERCENT,
     UNIT_REVOLUTIONS_PER_MINUTE,
+    UNIT_SECOND,
 )
 
 comfoair_ns = cg.esphome_ns.namespace("comfoair")
@@ -52,6 +52,9 @@ AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor", "select", "num
 REQUIRED_KEY_NAME = "name"
 CONF_HUB_ID = "comfoair"
 CONF_PROXY_UART_ID = "proxy_uart"
+CONF_CONNECTED = "connected"
+CONF_RESPONSE_AGE = "response_age"
+CONF_COMMUNICATION_TIMEOUT = "communication_timeout"
 
 UNIT_WEEK = "weeks"
 
@@ -152,6 +155,7 @@ CONF_SYNC_FAN_LEVELS = "sync_fan_levels"
 
 helper_comfoair = {
     "sensor": [
+        CONF_RESPONSE_AGE,
         CONF_INTAKE_FAN_SPEED,
         CONF_EXHAUST_FAN_SPEED,
         CONF_INTAKE_FAN_SPEED_RPM,
@@ -192,6 +196,7 @@ helper_comfoair = {
         CONF_EXTRACTOR_HOOD_SWITCH_OFF_DELAY_MINUTES,
     ],
     "binary_sensor": [
+        CONF_CONNECTED,
         CONF_BYPASS_PRESENT,
         CONF_ENTHALPY_PRESENT,
         CONF_EWT_PRESENT,
@@ -271,31 +276,53 @@ def _measurement_schema(*, device_class=DEVICE_CLASS_EMPTY, accuracy_decimals=0,
     )
 
 
-def _fan_level_schema(initial_value):
-    """Fan-level entities share limits but retain their per-level initial value."""
-    return number.number_schema(
+def _validate_fan_limits(config):
+    """Keep configurable UI limits inside the device's integer range."""
+    if config[CONF_MIN_VALUE] >= config[CONF_MAX_VALUE]:
+        raise cv.Invalid("min_value must be less than max_value")
+    return config
+
+
+def _fan_level_schema():
+    """Device readings initialize fan levels; YAML must not override calibration."""
+    return cv.All(number.number_schema(
         ComfoAirNumber,
         unit_of_measurement=UNIT_PERCENT,
         icon=ICON_FAN,
+        entity_category=ENTITY_CATEGORY_CONFIG,
     ).extend({
-        cv.Optional(CONF_INITIAL_VALUE, default=initial_value): cv.positive_float,
-        cv.Optional(CONF_MIN_VALUE, default=15): cv.positive_float,
-        cv.Optional(CONF_MAX_VALUE, default=95): cv.positive_float,
-        cv.Optional(CONF_STEP, default=1): cv.positive_float,
-    })
+        cv.Optional(CONF_MIN_VALUE, default=15): cv.int_range(min=15, max=95),
+        cv.Optional(CONF_MAX_VALUE, default=95): cv.int_range(min=15, max=95),
+        cv.Optional(CONF_STEP, default=1): cv.int_range(min=1, max=80),
+        cv.Optional(CONF_DISABLED_BY_DEFAULT, default=True): cv.boolean,
+    }), _validate_fan_limits)
 
 
 comfoair_sensors_schemas = cv.Schema(
     {
-        cv.Optional(CONF_TYPE): text_sensor.text_sensor_schema(),
-        cv.Optional(CONF_SIZE): text_sensor.text_sensor_schema(),
+        cv.Optional(CONF_CONNECTED): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_CONNECTIVITY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_RESPONSE_AGE): _measurement_schema(
+            unit_of_measurement=UNIT_SECOND,
+            accuracy_decimals=1,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_TYPE): text_sensor.text_sensor_schema(
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_SIZE): text_sensor.text_sensor_schema(
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
         cv.Optional(CONF_FILTER_STATUS): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_ERROR_STATUS): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_FROST_PROTECTION_LEVEL): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_PREHEATING_VALVE): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_SIZE_SELECT): select.select_schema(
-            ComfoAirSizeSelect
-        ).extend(),
+            ComfoAirSizeSelect,
+            entity_category=ENTITY_CATEGORY_CONFIG,
+        ).extend({cv.Optional(CONF_DISABLED_BY_DEFAULT, default=True): cv.boolean}),
 
         # Fan speeds in % and RPM. Home Assistant's speed class is for m/s or km/h.
         cv.Optional(CONF_INTAKE_FAN_SPEED): _measurement_schema(
@@ -359,92 +386,117 @@ comfoair_sensors_schemas = cv.Schema(
             unit_of_measurement=UNIT_PERCENT,
         ),
         # Bypass control values (0xE0) are unitless controller numbers.
-        cv.Optional(CONF_BYPASS_FACTOR): _measurement_schema(),
-        cv.Optional(CONF_BYPASS_STEP): _measurement_schema(),
-        cv.Optional(CONF_BYPASS_CORRECTION): _measurement_schema(),
+        cv.Optional(CONF_BYPASS_FACTOR): _measurement_schema(
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_BYPASS_STEP): _measurement_schema(
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_BYPASS_CORRECTION): _measurement_schema(
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
         cv.Optional(CONF_BYPASS_OPEN_HOURS): _measurement_schema(
-            unit_of_measurement=UNIT_HOUR,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC, unit_of_measurement=UNIT_HOUR,
         ),
         cv.Optional(CONF_MOTOR_CURRENT_BYPASS): _measurement_schema(
-            device_class=DEVICE_CLASS_CURRENT,
-            unit_of_measurement=UNIT_AMPERE,
-            accuracy_decimals=1,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MOTOR_CURRENT_PREHEATING): _measurement_schema(
-            device_class=DEVICE_CLASS_CURRENT,
-            unit_of_measurement=UNIT_AMPERE,
-            accuracy_decimals=1,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
 
         cv.Optional(CONF_PREHEATING_HOURS): _measurement_schema(
-            unit_of_measurement=UNIT_HOUR,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC, unit_of_measurement=UNIT_HOUR,
         ),
         cv.Optional(CONF_LEVEL0_HOURS): _measurement_schema(
-            unit_of_measurement=UNIT_HOUR,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC, unit_of_measurement=UNIT_HOUR,
         ),
         cv.Optional(CONF_LEVEL1_HOURS): _measurement_schema(
-            unit_of_measurement=UNIT_HOUR,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC, unit_of_measurement=UNIT_HOUR,
         ),
         cv.Optional(CONF_LEVEL2_HOURS): _measurement_schema(
-            unit_of_measurement=UNIT_HOUR,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC, unit_of_measurement=UNIT_HOUR,
         ),
         cv.Optional(CONF_LEVEL3_HOURS): _measurement_schema(
-            unit_of_measurement=UNIT_HOUR,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC, unit_of_measurement=UNIT_HOUR,
         ),
         cv.Optional(CONF_FROST_PROTECTION_HOURS): _measurement_schema(
-            unit_of_measurement=UNIT_HOUR,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC, unit_of_measurement=UNIT_HOUR,
         ),
         cv.Optional(CONF_FROST_PROTECTION_MINUTES): _measurement_schema(
             unit_of_measurement=UNIT_MINUTE,
         ),
         cv.Optional(CONF_FILTER_HOURS): _measurement_schema(
-            unit_of_measurement=UNIT_HOUR,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC, unit_of_measurement=UNIT_HOUR,
         ),
 
         cv.Optional(CONF_BYPASS_VALVE): _measurement_schema(
             unit_of_measurement=UNIT_PERCENT,
         ),
 
-        cv.Optional(CONF_BATHROOM_SWITCH_ON_DELAY_MINUTES): _measurement_schema(),
-        cv.Optional(CONF_BATHROOM_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(),
-        cv.Optional(CONF_L1_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(),
-        cv.Optional(CONF_BOOST_VENTILATION_MINUTES): _measurement_schema(),
+        cv.Optional(CONF_BATHROOM_SWITCH_ON_DELAY_MINUTES): _measurement_schema(
+            unit_of_measurement=UNIT_MINUTE, entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_BATHROOM_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(
+            unit_of_measurement=UNIT_MINUTE, entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_L1_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(
+            unit_of_measurement=UNIT_MINUTE, entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_BOOST_VENTILATION_MINUTES): _measurement_schema(
+            unit_of_measurement=UNIT_MINUTE, entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
         cv.Optional(CONF_FILTER_WARNING_WEEKS): _measurement_schema(
             unit_of_measurement=UNIT_WEEK,
         ),
-        cv.Optional(CONF_RF_HIGH_TIME_SHORT_MINUTES): _measurement_schema(),
-        cv.Optional(CONF_RF_HIGH_TIME_LONG_MINUTES): _measurement_schema(),
-        cv.Optional(CONF_EXTRACTOR_HOOD_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(),
+        cv.Optional(CONF_RF_HIGH_TIME_SHORT_MINUTES): _measurement_schema(
+            unit_of_measurement=UNIT_MINUTE, entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_RF_HIGH_TIME_LONG_MINUTES): _measurement_schema(
+            unit_of_measurement=UNIT_MINUTE, entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_EXTRACTOR_HOOD_SWITCH_OFF_DELAY_MINUTES): _measurement_schema(
+            unit_of_measurement=UNIT_MINUTE, entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
 
         cv.Optional(CONF_FROST_PROTECTION_ACTIVE): binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_EMPTY
         ).extend(),
         cv.Optional(CONF_BYPASS_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_ENTHALPY_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_EWT_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_OPTIONS_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_FIREPLACE_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_KITCHEN_HOOD_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_POSTHEATING_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_POSTHEATING_PWM_MODE_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_PREHEATING_PRESENT): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_BYPASS_VALVE_OPEN): binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_EMPTY
@@ -466,79 +518,100 @@ comfoair_sensors_schemas = cv.Schema(
         ).extend(),
 
         cv.Optional(CONF_P10_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P11_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P12_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P13_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P14_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P15_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P16_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P17_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P18_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P19_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P90_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P91_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P92_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P93_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P94_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P95_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P96_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
         cv.Optional(CONF_P97_ACTIVE): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_EMPTY
+            device_class=DEVICE_CLASS_EMPTY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC
         ).extend(),
 
-        cv.Optional(CONF_RETURN_AIR_LEVEL_ABSENT): _fan_level_schema(15),
-        cv.Optional(CONF_RETURN_AIR_LEVEL_LOW): _fan_level_schema(35),
-        cv.Optional(CONF_RETURN_AIR_LEVEL_MEDIUM): _fan_level_schema(50),
-        cv.Optional(CONF_RETURN_AIR_LEVEL_HIGH): _fan_level_schema(70),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL_ABSENT): _fan_level_schema(15),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL_LOW): _fan_level_schema(35),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL_MEDIUM): _fan_level_schema(50),
-        cv.Optional(CONF_SUPPLY_AIR_LEVEL_HIGH): _fan_level_schema(70),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_ABSENT): _fan_level_schema(),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_LOW): _fan_level_schema(),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_MEDIUM): _fan_level_schema(),
+        cv.Optional(CONF_RETURN_AIR_LEVEL_HIGH): _fan_level_schema(),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_ABSENT): _fan_level_schema(),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_LOW): _fan_level_schema(),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_MEDIUM): _fan_level_schema(),
+        cv.Optional(CONF_SUPPLY_AIR_LEVEL_HIGH): _fan_level_schema(),
         cv.Optional(CONF_SYNC_FAN_LEVELS): button.button_schema(
             ComfoAirSyncButton,
             icon="mdi:sync",
+            entity_category=ENTITY_CATEGORY_CONFIG,
         ).extend(),
         cv.Optional(CONF_FILTER_RESET): button.button_schema(
             ComfoAirFilterResetButton,
             icon="mdi:air-filter",
+            entity_category=ENTITY_CATEGORY_CONFIG,
         ),
         cv.Optional(CONF_ERROR_RESET): button.button_schema(
             ComfoAirErrorResetButton,
             icon="mdi:alert-circle-check",
+            entity_category=ENTITY_CATEGORY_CONFIG,
         ),
     }
 )
@@ -548,6 +621,9 @@ CONFIG_SCHEMA = (
         {
             cv.Required(REQUIRED_KEY_NAME): cv.string,
             cv.Optional(CONF_PROXY_UART_ID): cv.use_id(uart.UARTComponent),
+            cv.Optional(
+                CONF_COMMUNICATION_TIMEOUT, default="90s"
+            ): cv.positive_time_period_milliseconds,
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -591,6 +667,7 @@ async def to_code(config):
     await uart.register_uart_device(var, config)
     await climate.register_climate(var, config)
     cg.add(var.set_name(config[REQUIRED_KEY_NAME]))
+    cg.add(var.set_communication_timeout(config[CONF_COMMUNICATION_TIMEOUT].total_milliseconds))
     paren = await cg.get_variable(config[CONF_UART_ID])
     cg.add(var.set_uart_component(paren))
     if CONF_PROXY_UART_ID in config:
@@ -598,7 +675,7 @@ async def to_code(config):
         cg.add(var.set_proxy_uart_component(proxy_uart))
     for k, values in helper_comfoair.items():
         for v in values:
-            if not v in config:
+            if v not in config:
                 continue
             sens = None
             if k == "sensor":

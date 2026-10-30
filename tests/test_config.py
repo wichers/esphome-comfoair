@@ -95,9 +95,9 @@ class ConfigTests(unittest.TestCase):
         for key in helper_comfoair["sensor"]:
             self.assertEqual(validated[key]["state_class"], "measurement")
         for key in helper_comfoair["number"]:
-            level = key.rsplit("_", 1)[1]
-            self.assertEqual(validated[key]["initial_value"],
-                             {"absent": 15, "low": 35, "medium": 50, "high": 70}[level])
+            self.assertNotIn("initial_value", validated[key])
+            self.assertEqual(validated[key]["entity_category"], "config")
+            self.assertTrue(validated[key]["disabled_by_default"])
             self.assertEqual(validated[key]["min_value"], 15)
             self.assertEqual(validated[key]["max_value"], 95)
             self.assertEqual(validated[key]["step"], 1)
@@ -109,11 +109,22 @@ class ConfigTests(unittest.TestCase):
             "intake_fan_speed_rpm": "RPM", "exhaust_fan_speed_rpm": "RPM",
             "return_air_level": "%", "supply_air_level": "%", "bypass_valve": "%",
             "bypass_factor": None, "bypass_step": None, "bypass_correction": None,
+            "motor_current_bypass": None, "motor_current_preheating": None,
         }
         for key, unit in units.items():
             with self.subTest(sensor=key):
                 self.assertFalse(validated[key].get("device_class"))
                 self.assertEqual(validated[key].get("unit_of_measurement"), unit)
+
+    def test_fan_limits(self):
+        """Reject unsupported limits and the formerly ignored initial_value."""
+        for options in ({"min_value": 0}, {"max_value": 100}, {"step": 0.5},
+                        {"min_value": 70, "max_value": 35}, {"initial_value": 50}):
+            with self.subTest(options=options):
+                result, _ = self.run_config(
+                    entities={"return_air_level_low": {"name": "Low", **options}}
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_invalid_uart(self):
         """Invalid UART settings fail before compilation with useful errors."""
