@@ -2,82 +2,98 @@
 
 #include "esphome/components/comfoair/comfoair.h"
 #include <algorithm>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <deque>
 #include <vector>
 
 // Keep checks active even when the firmware build defines NDEBUG.
-#define CHECK(condition) do { if (!(condition)) { \
-  std::fprintf(stderr, "Protocol check failed at line %d: %s\n", __LINE__, #condition); \
-  std::abort(); \
-} } while (0)
+#define CHECK(condition)                                                                                               \
+  do                                                                                                                   \
+  {                                                                                                                    \
+    if (!(condition))                                                                                                  \
+    {                                                                                                                  \
+      std::fprintf(stderr, "Protocol check failed at line %d: %s\n", __LINE__, #condition);                            \
+      std::abort();                                                                                                    \
+    }                                                                                                                  \
+  } while (0)
 
-class TestUART : public esphome::uart::UARTComponent {
- public:
+class TestUART : public esphome::uart::UARTComponent
+{
+public:
   std::vector<uint8_t> output;
   std::deque<uint8_t> input;
-  void write_array(const uint8_t *data, size_t len) override {
-    output.insert(output.end(), data, data + len);
-  }
-  bool peek_byte(uint8_t *data) override {
-    if (input.empty()) return false;
+  void write_array(const uint8_t *data, size_t len) override { output.insert(output.end(), data, data + len); }
+  bool peek_byte(uint8_t *data) override
+  {
+    if (input.empty())
+      return false;
     *data = input.front();
     return true;
   }
-  bool read_array(uint8_t *data, size_t len) override {
-    if (input.size() < len) return false;
-    while (len--) { *data++ = input.front(); input.pop_front(); }
+  bool read_array(uint8_t *data, size_t len) override
+  {
+    if (input.size() < len)
+      return false;
+    while (len--)
+    {
+      *data++ = input.front();
+      input.pop_front();
+    }
     return true;
   }
   size_t available() override { return input.size(); }
-  esphome::uart::UARTFlushResult flush() override {
-    return esphome::uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS;
-  }
- protected:
+  esphome::uart::UARTFlushResult flush() override { return esphome::uart::UARTFlushResult::UART_FLUSH_RESULT_SUCCESS; }
+
+protected:
   void check_logger_conflict() override {}
 };
 
-class TestComfoAir : public esphome::comfoair::ComfoAirComponent {
- public:
-  using ComfoAirComponent::calcChecksum_;
-  using ComfoAirComponent::checkRx_;
-  using ComfoAirComponent::write_command_;
-  using ComfoAirComponent::parseRxMessage_;
+class TestComfoAir : public esphome::comfoair::ComfoAirComponent
+{
+public:
   using ComfoAirComponent::bootloader_version_;
-  using ComfoAirComponent::firmware_version_;
-  using ComfoAirComponent::connector_board_version_;
-  using ComfoAirComponent::BusOwner;
-  using ComfoAirComponent::bus_owner_;
   using ComfoAirComponent::bus_busy_since_;
+  using ComfoAirComponent::bus_owner_;
+  using ComfoAirComponent::BusOwner;
+  using ComfoAirComponent::calcChecksum_;
   using ComfoAirComponent::caRxIdx_u8;
-  using ComfoAirComponent::last_unit_rx_;
+  using ComfoAirComponent::check_communication_;
+  using ComfoAirComponent::checkRx_;
+  using ComfoAirComponent::connector_board_version_;
+  using ComfoAirComponent::firmware_version_;
+  using ComfoAirComponent::last_command_sent_;
   using ComfoAirComponent::last_display_frame_;
+  using ComfoAirComponent::last_health_check_;
+  using ComfoAirComponent::last_unit_rx_;
+  using ComfoAirComponent::last_valid_response_;
+  using ComfoAirComponent::parseRxMessage_;
   using ComfoAirComponent::queued_command_count_;
   using ComfoAirComponent::queued_commands_;
   using ComfoAirComponent::send_control_command_;
-  using ComfoAirComponent::last_command_sent_;
   using ComfoAirComponent::update_counter_;
+  using ComfoAirComponent::write_command_;
 };
 
 // Display proxy: the unit is on uart, the ComfoSense display on display.
-inline void run_proxy_tests() {
+inline void run_proxy_tests()
+{
   using namespace esphome;
   TestUART unit, display;
   TestComfoAir component;
   component.set_uart_parent(&unit);
   component.set_proxy_uart_component(&display);
-  const std::vector<uint8_t> poll_level = {7, 0xF0, 0, CMD_GET_VENTILATION_LEVEL, 0,
-      uint8_t(0xAD + CMD_GET_VENTILATION_LEVEL), 7, 0x0F};
+  const std::vector<uint8_t> poll_level = {
+      7, 0xF0, 0, CMD_GET_VENTILATION_LEVEL, 0, uint8_t(0xAD + CMD_GET_VENTILATION_LEVEL), 7, 0x0F};
 
   // A poll that cannot be sent keeps its slot. A slot without entities still
   // advances, also after an earlier failed send.
-  component.caRxIdx_u8 = 3;  // The unit is sending a frame.
+  component.caRxIdx_u8 = 3; // The unit is sending a frame.
   component.update_counter_ = 3;
   component.update();
   CHECK(unit.output.empty() && component.update_counter_ == 3 && !component.last_command_sent_);
   component.caRxIdx_u8 = 0;
-  component.update_counter_ = 0;  // Fan status, but no fan entities.
+  component.update_counter_ = 0; // Fan status, but no fan entities.
   component.update();
   CHECK(unit.output.empty() && component.update_counter_ == 1);
   component.update_counter_ = 3;
@@ -85,11 +101,13 @@ inline void run_proxy_tests() {
   CHECK(unit.output == poll_level && component.update_counter_ == 4);
   CHECK(component.bus_owner_ == TestComfoAir::BusOwner::ESP);
 
-  auto set_level_frame = [](uint8_t level) {
-    return std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_LEVEL, 1, level,
-        uint8_t(0xAD + CMD_SET_LEVEL + 1 + level), 7, 0x0F});
+  auto set_level_frame = [](uint8_t level)
+  {
+    return std::vector<uint8_t>(
+        {7, 0xF0, 0, CMD_SET_LEVEL, 1, level, uint8_t(0xAD + CMD_SET_LEVEL + 1 + level), 7, 0x0F});
   };
-  auto receive = [&](TestUART &from, const std::vector<uint8_t> &bytes) {
+  auto receive = [&](TestUART &from, const std::vector<uint8_t> &bytes)
+  {
     from.input.assign(bytes.begin(), bytes.end());
     component.loop();
   };
@@ -118,7 +136,8 @@ inline void run_proxy_tests() {
   receive(unit, {7, 0xF3});
 
   // Wire frames with checksum and escaping, from a component without proxy.
-  auto frame_of = [](uint8_t command, const std::vector<uint8_t> &payload) {
+  auto frame_of = [](uint8_t command, const std::vector<uint8_t> &payload)
+  {
     TestUART out;
     TestComfoAir encoder;
     encoder.set_uart_parent(&out);
@@ -128,19 +147,21 @@ inline void run_proxy_tests() {
   const auto display_poll = frame_of(CMD_GET_VENTILATION_LEVEL, {});
   const auto unit_reply = frame_of(RES_GET_VENTILATION_LEVEL, {15, 35, 50, 15, 35, 50, 35, 35, 2, 1, 70, 70});
   // The display polls, the unit replies to the display, and the display ACKs.
-  auto display_transaction = [&]() {
+  auto display_transaction = [&]()
+  {
     unit.output.clear();
     display.output.clear();
     receive(display, display_poll);
     CHECK(unit.output == display_poll && component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
     unit.output.clear();
     receive(unit, unit_reply);
-    CHECK(unit.output.empty() && display.output == unit_reply);  // The display ACKs, not the ESP.
+    CHECK(unit.output.empty() && display.output == unit_reply); // The display ACKs, not the ESP.
     CHECK(component.bus_owner_ == TestComfoAir::BusOwner::IDLE);
     receive(display, {7, 0xF3});
     CHECK(unit.output == std::vector<uint8_t>({7, 0xF3}));
   };
-  auto after_quiet_window = [&]() {
+  auto after_quiet_window = [&]()
+  {
     component.last_display_frame_ = esphome::millis() - 300;
     unit.output.clear();
     component.loop();
@@ -175,7 +196,7 @@ inline void run_proxy_tests() {
   CHECK(component.queued_command_count_ == 0 && component.bus_owner_ == TestComfoAir::BusOwner::ESP);
   unit.output.clear();
   receive(unit, {7, 0xF3});
-  CHECK(display.output.empty());  // The ACK to the ESP is not mirrored.
+  CHECK(display.output.empty()); // The ACK to the ESP is not mirrored.
   CHECK(unit.output == display_poll && component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
   receive(unit, unit_reply);
   receive(display, {7, 0xF3});
@@ -200,10 +221,11 @@ inline void run_proxy_tests() {
       frame_of(CMD_RESET_AND_SELF_TEST, {0, 0, 0, 1}),
       frame_of(CMD_RESET_AND_SELF_TEST, {1, 0, 0, 0}),
   };
-  for (const auto &frame : expected) {
+  for (const auto &frame : expected)
+  {
     CHECK(after_quiet_window() == frame);
     component.loop();
-    CHECK(unit.output == frame);  // Nothing more until the ACK.
+    CHECK(unit.output == frame); // Nothing more until the ACK.
     receive(unit, {7, 0xF3});
   }
   CHECK(component.queued_command_count_ == 0 && after_quiet_window().empty());
@@ -219,19 +241,74 @@ inline void run_proxy_tests() {
 
   // A full display transaction still works after all of this.
   display_transaction();
+
+  // An intermediate ACK must not hand an ESP poll's reply to a waiting display.
+  unit.output.clear();
+  display.output.clear();
+  component.update_counter_ = 3;
+  component.update();
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::ESP);
+  receive(display, display_poll);
+  unit.output.clear();
+  receive(unit, {7, 0xF3});
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::ESP);
+  CHECK(unit.output.empty() && display.output.empty());
+  receive(unit, unit_reply);
+  std::vector<uint8_t> ack_and_poll_frame = {7, 0xF3};
+  ack_and_poll_frame.insert(ack_and_poll_frame.end(), display_poll.begin(), display_poll.end());
+  CHECK(unit.output == ack_and_poll_frame && display.output.empty());
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
+  // The same ACK/reply sequence keeps the display's ownership until its reply.
+  receive(unit, {7, 0xF3});
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::PROXY);
+  receive(unit, unit_reply);
+  CHECK(component.bus_owner_ == TestComfoAir::BusOwner::IDLE);
+  std::vector<uint8_t> display_ack_and_reply = {7, 0xF3};
+  display_ack_and_reply.insert(display_ack_and_reply.end(), unit_reply.begin(), unit_reply.end());
+  CHECK(display.output == display_ack_and_reply);
+  receive(display, {7, 0xF3});
 }
 
 // Synthetic fixtures based on registers.h; these are not captured unit traffic.
-inline void run_decoder_tests() {
+inline void run_decoder_tests()
+{
   using namespace esphome;
   TestUART uart;
   TestComfoAir component;
   component.set_uart_parent(&uart);
-  auto decode = [&](uint8_t command, std::initializer_list<uint8_t> payload) {
+  auto decode = [&](uint8_t command, std::initializer_list<uint8_t> payload)
+  {
     std::vector<uint8_t> message{0, command, uint8_t(payload.size())};
     message.insert(message.end(), payload.begin(), payload.end());
-    component.parseRxMessage_(message.data());
+    CHECK(component.parseRxMessage_(message.data()));
   };
+  // Every supported response rejects each shorter length before reading fields.
+  const std::pair<uint8_t, uint8_t> minimums[] = {{RES_GET_BOOTLOADER_VERSION, 3},
+                                                  {RES_GET_FIRMWARE_VERSION, 3},
+                                                  {RES_GET_CONNECTOR_BOARD_VERSION, 2},
+                                                  {RES_GET_FAN_STATUS, 6},
+                                                  {RES_GET_VALVE_STATUS, 4},
+                                                  {RES_GET_TEMPERATURE_STATUS, 4},
+                                                  {RES_GET_BYPASS_CONTROL_STATUS, 7},
+                                                  {RES_GET_SENSOR_DATA, 1},
+                                                  {RES_GET_VENTILATION_LEVEL, 12},
+                                                  {RES_GET_FAULTS, 9},
+                                                  {RES_GET_TEMPERATURES, 9},
+                                                  {RES_GET_STATUS, 11},
+                                                  {RES_GET_OPERATION_HOURS, 20},
+                                                  {RES_GET_PREHEATING_STATUS, 6},
+                                                  {RES_GET_TIME_DELAY, 8}};
+  for (const auto &entry : minimums)
+  {
+    for (uint8_t length = 0; length < entry.second; length++)
+    {
+      // Deliberately exact-sized storage: sanitizers catch reads past the payload.
+      std::vector<uint8_t> message(3 + length, 0);
+      message[1] = entry.first;
+      message[2] = length;
+      CHECK(!component.parseRxMessage_(message.data()));
+    }
+  }
   decode(RES_GET_BOOTLOADER_VERSION, {3, 70, 32});
   decode(RES_GET_FIRMWARE_VERSION, {3, 71, 33});
   decode(RES_GET_CONNECTOR_BOARD_VERSION, {2, 12});
@@ -261,7 +338,7 @@ inline void run_decoder_tests() {
   CHECK(bypass.state == 100 && bypass_open.state && preheat_open.state);
   CHECK(bypass_current.state == 12 && preheat_current.state == 34);
   decode(RES_GET_VALVE_STATUS, {0, 2, 0, 0});
-  CHECK(!bypass_open.state && preheat_open.state);  // Unknown must not become closed.
+  CHECK(!bypass_open.state && preheat_open.state); // Unknown must not become closed.
 
   sensor::Sensor factor, step, correction;
   binary_sensor::BinarySensor summer;
@@ -292,7 +369,7 @@ inline void run_decoder_tests() {
   CHECK(outside.state == 1 && supply.state == 11 && returning.state == 22);
   CHECK(exiting.state == 23 && ewt.state == 24 && reheating.state == 25 && hood.state == 26);
   decode(RES_GET_TEMPERATURES, {80, 0, 0, 0, 0, 0, 0, 0, 0});
-  CHECK(outside.state == 1 && returning.state == 22);  // Presence mask gates updates.
+  CHECK(outside.state == 1 && returning.state == 22); // Presence mask gates updates.
 
   sensor::Sensor return_level, supply_level, ventilation;
   binary_sensor::BinarySensor supply_active;
@@ -313,10 +390,13 @@ inline void run_decoder_tests() {
   CHECK(return_level.state == 40 && supply_level.state == 41 && ventilation.state == 1);
   CHECK(supply_active.state && component.fan_mode == climate::CLIMATE_FAN_LOW);
   const int expected_numbers[] = {15, 35, 50, 70, 16, 36, 51, 71};
-  for (int i = 0; i < 8; ++i) CHECK(fan_numbers[i].state == expected_numbers[i]);
+  for (int i = 0; i < 8; ++i)
+    CHECK(fan_numbers[i].state == expected_numbers[i]);
   const climate::ClimateFanMode modes[] = {climate::CLIMATE_FAN_AUTO, climate::CLIMATE_FAN_OFF,
-      climate::CLIMATE_FAN_LOW, climate::CLIMATE_FAN_MEDIUM, climate::CLIMATE_FAN_HIGH};
-  for (uint8_t level = 0; level < 5; ++level) {
+                                           climate::CLIMATE_FAN_LOW, climate::CLIMATE_FAN_MEDIUM,
+                                           climate::CLIMATE_FAN_HIGH};
+  for (uint8_t level = 0; level < 5; ++level)
+  {
     decode(RES_GET_VENTILATION_LEVEL, {15, 35, 50, 15, 35, 50, 35, 35, level, 1, 70, 70});
     CHECK(ventilation.state == static_cast<int>(level) - 1);
     CHECK(component.fan_mode == modes[level]);
@@ -325,15 +405,15 @@ inline void run_decoder_tests() {
     auto call = component.make_call();
     call.set_fan_mode(modes[level]);
     component.control(call);
-    CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_LEVEL, 1,
-          level, uint8_t(0xAD + CMD_SET_LEVEL + 1 + level), 7, 0x0F}));
+    CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_LEVEL, 1, level,
+                                               uint8_t(0xAD + CMD_SET_LEVEL + 1 + level), 7, 0x0F}));
   }
   uart.output.clear();
   auto call = component.make_call();
   call.set_target_temperature(21.5f);
   component.control(call);
-  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_COMFORT_TEMPERATURE, 1,
-        83, uint8_t(0xAD + CMD_SET_COMFORT_TEMPERATURE + 1 + 83), 7, 0x0F}));
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_COMFORT_TEMPERATURE, 1, 83,
+                                             uint8_t(0xAD + CMD_SET_COMFORT_TEMPERATURE + 1 + 83), 7, 0x0F}));
   uart.output.clear();
   component.set_level(-1);
   component.set_level(5);
@@ -355,7 +435,8 @@ inline void run_decoder_tests() {
 
   // Fault bits: A1-A8 (byte 0), E1-E8 (byte 1), EA1-EA8 (byte 9), A9-A15 and A0 (byte 13).
   // The 0xFF filler after the payload shows reads past the declared length.
-  auto decode_in_buffer = [&](uint8_t command, std::initializer_list<uint8_t> payload) {
+  auto decode_in_buffer = [&](uint8_t command, std::initializer_list<uint8_t> payload)
+  {
     std::vector<uint8_t> message(comfoair::MAX_MESSAGE_SIZE, 0xFF);
     message[0] = 0;
     message[1] = command;
@@ -382,7 +463,8 @@ inline void run_decoder_tests() {
   CHECK(errors.state == "A1" && filter.state == "Ok" && !full.state);
 
   // A short fault payload in a valid frame gets an ACK but changes no state.
-  for (uint8_t length : {0, 8}) {
+  for (uint8_t length : {0, 8})
+  {
     const std::vector<uint8_t> payload(length, 0x01);
     uart.output.clear();
     component.write_command_(RES_GET_FAULTS, payload.data(), length);
@@ -400,12 +482,12 @@ inline void run_decoder_tests() {
   component.set_error_reset(&error_reset);
   uart.output.clear();
   filter_reset.press();
-  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_RESET_AND_SELF_TEST, 4,
-        0, 0, 0, 1, uint8_t(0xAD + CMD_RESET_AND_SELF_TEST + 4 + 1), 7, 0x0F}));
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_RESET_AND_SELF_TEST, 4, 0, 0, 0, 1,
+                                             uint8_t(0xAD + CMD_RESET_AND_SELF_TEST + 4 + 1), 7, 0x0F}));
   uart.output.clear();
   error_reset.press();
-  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_RESET_AND_SELF_TEST, 4,
-        1, 0, 0, 0, uint8_t(0xAD + CMD_RESET_AND_SELF_TEST + 4 + 1), 7, 0x0F}));
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_RESET_AND_SELF_TEST, 4, 1, 0, 0, 0,
+                                             uint8_t(0xAD + CMD_RESET_AND_SELF_TEST + 4 + 1), 7, 0x0F}));
 
   // Update slot 5 polls the faults when only error_status is configured.
   {
@@ -419,8 +501,8 @@ inline void run_decoder_tests() {
     poller.error_status = &only_errors;
     poller.update_counter_ = 5;
     poller.update();
-    CHECK(poll_uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_GET_FAULTS, 0,
-          uint8_t(0xAD + CMD_GET_FAULTS), 7, 0x0F}));
+    CHECK(poll_uart.output ==
+          std::vector<uint8_t>({7, 0xF0, 0, CMD_GET_FAULTS, 0, uint8_t(0xAD + CMD_GET_FAULTS), 7, 0x0F}));
   }
   component.type = &type;
   component.size = &size;
@@ -444,13 +526,18 @@ inline void run_decoder_tests() {
   CHECK(type.state == "Right" && !p10.state && !p97.state && !fireplace.state);
 
   sensor::Sensor hours[8];
-  component.level0_hours = &hours[0]; component.level1_hours = &hours[1];
-  component.level2_hours = &hours[2]; component.level3_hours = &hours[3];
-  component.frost_protection_hours = &hours[4]; component.preheating_hours = &hours[5];
-  component.bypass_open_hours = &hours[6]; component.filter_hours = &hours[7];
+  component.level0_hours = &hours[0];
+  component.level1_hours = &hours[1];
+  component.level2_hours = &hours[2];
+  component.level3_hours = &hours[3];
+  component.frost_protection_hours = &hours[4];
+  component.preheating_hours = &hours[5];
+  component.bypass_open_hours = &hours[6];
+  component.filter_hours = &hours[7];
   decode(RES_GET_OPERATION_HOURS, {1, 2, 3, 0, 0, 4, 0, 1, 0, 1, 2, 2, 3, 3, 4, 4, 5, 2, 3, 4});
   const int expected_hours[] = {66051, 4, 256, 131844, 258, 515, 772, 1029};
-  for (int i = 0; i < 8; ++i) CHECK(hours[i].state == expected_hours[i]);
+  for (int i = 0; i < 8; ++i)
+    CHECK(hours[i].state == expected_hours[i]);
   sensor::Sensor minutes;
   component.preheating_valve = &valve;
   component.preheating_active = &preheat_active;
@@ -473,24 +560,120 @@ inline void run_decoder_tests() {
   component.rf_high_time_long_minutes = &delays[6];
   component.extractor_hood_switch_off_delay_minutes = &delays[7];
   decode(RES_GET_TIME_DELAY, {1, 2, 3, 4, 5, 6, 7, 8});
-  for (int i = 0; i < 8; ++i) CHECK(delays[i].state == i + 1);
+  for (int i = 0; i < 8; ++i)
+    CHECK(delays[i].state == i + 1);
 }
 
-inline void run_protocol_tests() {
+inline void run_control_tests()
+{
+  using namespace esphome;
+  TestUART uart;
+  TestComfoAir component;
+  component.set_uart_parent(&uart);
+  component.setup();
+  auto decode = [&](uint8_t command, std::initializer_list<uint8_t> payload)
+  {
+    std::vector<uint8_t> message{0, command, uint8_t(payload.size())};
+    message.insert(message.end(), payload.begin(), payload.end());
+    CHECK(component.parseRxMessage_(message.data()));
+  };
+  // A climate-only configuration gets temperature in its first publication.
+  bool saw_current_temperature = false;
+  component.add_on_state_callback([&](climate::Climate &state)
+                                  { saw_current_temperature = state.current_temperature == 22; });
+  decode(RES_GET_TEMPERATURES, {82, 42, 62, 84, 86, 0x04, 88, 90, 92});
+  CHECK(component.current_temperature == 22 && saw_current_temperature);
+  component.set_comfort_temperature(NAN);
+  CHECK(uart.output.empty());
+
+  // One exposed tuning control preserves all seven other device settings.
+  comfoair::ComfoAirNumber low;
+  low.traits.set_min_value(15);
+  low.traits.set_max_value(95);
+  low.traits.set_step(1);
+  component.set_return_air_level_low(&low);
+  low.make_call().set_value(40).perform();
+  CHECK(uart.output.empty()); // No write before the baseline arrives.
+  decode(RES_GET_VENTILATION_LEVEL, {16, 36, 51, 17, 37, 52, 36, 37, 2, 1, 71, 72});
+  low.make_call().set_value(40).perform();
+  CHECK(low.state == 36); // Only device readback changes the displayed state.
+  const std::vector<uint8_t> tuning = {7,    0xF0, 0,   CMD_SET_VENTILATION_LEVEL, 9, 16, 40, 51, 17, 37, 52, 71, 72, 0,
+                                       0xE9, 7,    0x0F};
+  CHECK(uart.output == tuning);
+  uart.output.clear();
+  component.update(); // Read back promptly, rather than waiting a complete cycle.
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_GET_VENTILATION_LEVEL, 0, 0x7A, 7, 0x0F}));
+  decode(RES_GET_VENTILATION_LEVEL, {16, 40, 51, 17, 37, 52, 40, 37, 2, 1, 71, 72});
+  CHECK(low.state == 40);
+
+  // Unit size is confirmed by status, never by the act of queuing a write.
+  text_sensor::TextSensor size;
+  component.size = &size;
+  decode(RES_GET_STATUS, {1, 1, 1, 1, 0x47, 0, 0, 0, 0, 0, 0});
+  CHECK(size.state == "Large");
+  CHECK(component.set_unit_size(2));
+  CHECK(size.state == "Large");
+  uart.output.clear();
+  component.update();
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_GET_STATUS, 0, 0x82, 7, 0x0F}));
+  decode(RES_GET_STATUS, {1, 1, 1, 2, 0x47, 0, 0, 0, 0, 0, 0});
+  CHECK(size.state == "Small");
+
+  // Silence invalidates live numeric data and blocks installer writes.
+  sensor::Sensor temperature, age;
+  binary_sensor::BinarySensor connected;
+  component.return_air_temperature = &temperature;
+  component.set_response_age(&age);
+  component.set_connected(&connected);
+  temperature.publish_state(22);
+  component.set_communication_timeout(1000);
+  component.last_valid_response_ = millis() - 2000;
+  component.last_health_check_ = millis() - 1000;
+  component.check_communication_();
+  CHECK(!connected.state && std::isnan(temperature.state));
+  CHECK(std::isnan(component.current_temperature) && age.state >= 2);
+  uart.output.clear();
+  CHECK(!component.set_unit_size(1));
+  low.make_call().set_value(45).perform();
+  CHECK(uart.output.empty());
+  // Noise or a short response cannot turn connectivity back on.
+  uint8_t short_response[] = {0, RES_GET_STATUS, 0};
+  CHECK(!component.parseRxMessage_(short_response));
+  decode(RES_GET_TEMPERATURES, {82, 42, 62, 84, 86, 0x04, 88, 90, 92});
+  component.last_health_check_ = millis() - 1000;
+  component.check_communication_();
+  CHECK(connected.state && component.current_temperature == 22);
+
+  // A motor-current sensor alone must request its source response.
+  TestUART motor_uart;
+  TestComfoAir motor;
+  sensor::Sensor current;
+  motor.set_uart_parent(&motor_uart);
+  motor.motor_current_bypass = &current;
+  motor.update_counter_ = 1;
+  motor.update();
+  CHECK(motor_uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_GET_VALVE_STATUS, 0, 0xBA, 7, 0x0F}));
+}
+
+inline void run_protocol_tests()
+{
   using namespace esphome::comfoair;
   TestUART uart;
   TestComfoAir component;
   component.set_uart_parent(&uart);
-  struct {
+  struct
+  {
     uint8_t before{0xA5};
     uint8_t data[MAX_MESSAGE_SIZE]{};
     uint8_t after{0x5A};
   } guarded;
   uint8_t *buffer = guarded.data;
   uint8_t index = 0;
-  auto feed = [&](const std::vector<uint8_t> &bytes) {
+  auto feed = [&](const std::vector<uint8_t> &bytes)
+  {
     rx_status status = RX_STATUS_DEFAULT;
-    for (uint8_t byte : bytes) {
+    for (uint8_t byte : bytes)
+    {
       status = component.checkRx_(buffer, &index, byte);
       CHECK(index < MAX_MESSAGE_SIZE);
       CHECK(guarded.before == 0xA5 && guarded.after == 0x5A);
@@ -505,6 +688,19 @@ inline void run_protocol_tests() {
   CHECK(uart.output == frame);
   CHECK(feed(frame) == RX_STATUS_RECEIVED_MESSAGE);
   CHECK(buffer[3] == 7);
+
+  // 07 07 0F inside the payload is an escaped 07 followed by data, not STOP.
+  CHECK(feed({7, 0xF0, 0, 0x10, 4, 7, 7, 0x0F, 80, 81, 0x78, 7, 0x0F}) == RX_STATUS_RECEIVED_MESSAGE);
+  CHECK(buffer[3] == 7 && buffer[4] == 0x0F && buffer[6] == 81);
+  // Exercise all bytes following an escaped prefix, including START and ACK.
+  for (unsigned suffix = 0; suffix <= 255; suffix++)
+  {
+    const uint8_t data[] = {7, uint8_t(suffix), 7, 7};
+    uart.output.clear();
+    component.write_command_(0x10, data, sizeof(data));
+    CHECK(feed(uart.output) == RX_STATUS_RECEIVED_MESSAGE);
+    CHECK(std::equal(data, data + sizeof(data), buffer + 3));
+  }
 
   auto corrupt = frame;
   corrupt[7] ^= 1;
@@ -535,8 +731,7 @@ inline void run_protocol_tests() {
   payload.push_back(7);
   component.write_command_(0x10, payload.data(), payload.size());
   CHECK(uart.output.empty());
-  CHECK(feed({7, 0xF0, 0, 0x10, uint8_t(MAX_PROTOCOL_DATA_SIZE + 1)}) ==
-        RX_STATUS_RECEIVED_INVALID_MESSAGE);
+  CHECK(feed({7, 0xF0, 0, 0x10, uint8_t(MAX_PROTOCOL_DATA_SIZE + 1)}) == RX_STATUS_RECEIVED_INVALID_MESSAGE);
   CHECK(index == 0);
   // Repeated wraps must stay in bounds and allow the next frame to resynchronize.
   feed(std::vector<uint8_t>(MAX_MESSAGE_SIZE * 4, 0x55));
@@ -546,16 +741,19 @@ inline void run_protocol_tests() {
   CHECK(index == 0);
 
   // Exercise the real loop: only valid messages get an ACK; ACKs are not echoed.
-  for (const auto &bytes : {frame, corrupt, std::vector<uint8_t>{7, 0xF3},
-                            std::vector<uint8_t>{7, 0xF0, 0, 0x10}}) {
+  for (const auto &bytes : {frame, corrupt, std::vector<uint8_t>{7, 0xF3}, std::vector<uint8_t>{7, 0xF0, 0, 0x10}})
+  {
     uart.output.clear();
     uart.input.assign(bytes.begin(), bytes.end());
     component.loop();
-    if (bytes == frame) CHECK(uart.output == std::vector<uint8_t>({7, 0xF3}));
-    else CHECK(uart.output.empty());
+    if (bytes == frame)
+      CHECK(uart.output == std::vector<uint8_t>({7, 0xF3}));
+    else
+      CHECK(uart.output.empty());
   }
   run_decoder_tests();
   run_proxy_tests();
+  run_control_tests();
   std::puts("ComfoAir protocol and decoder tests passed");
 }
 

@@ -14,6 +14,7 @@
 #include "registers.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace esphome
 {
@@ -115,6 +116,8 @@ public:
   // Poll every 2000ms (previously 600ms)
   ComfoAirComponent() : Climate(), PollingComponent(2000), UARTDevice() {}
 
+  void setup() override { this->started_at_ = millis(); }
+
   // Return the traits of this controller.
   climate::ClimateTraits traits() override
   {
@@ -143,8 +146,7 @@ public:
     {
       int level;
 
-      fan_mode = *call.get_fan_mode();
-      switch (fan_mode.value())
+      switch (*call.get_fan_mode())
       {
       case climate::CLIMATE_FAN_HIGH:
         level = 0x04;
@@ -176,17 +178,16 @@ public:
     }
     if (call.get_target_temperature().has_value())
     {
-      target_temperature = *call.get_target_temperature();
-      set_comfort_temperature_(target_temperature);
+      set_comfort_temperature_(*call.get_target_temperature());
     }
-
-    publish_state();
   }
 
   void dump_config() override
   {
     uint8_t *p;
     ESP_LOGCONFIG(TAG, "ComfoAir:");
+    ESP_LOGCONFIG(TAG, "  Component version: 1.0.0");
+    ESP_LOGCONFIG(TAG, "  Communication timeout: %u ms", static_cast<unsigned>(this->communication_timeout_));
     // LOG_UPDATE_INTERVAL(this);
     p = bootloader_version_;
     ESP_LOGCONFIG(TAG, "  Bootloader %.10s v%0d.%02d b%2d", p + 3, *p, *(p + 1), *(p + 2));
@@ -220,6 +221,26 @@ public:
     }
     if (this->in_display_quiet_window_())
     {
+      return;
+    }
+
+    // Confirm writes using device responses, including rejected or expired writes.
+    if (this->refresh_status_)
+    {
+      if (write_command_(CMD_GET_STATUS, nullptr, 0))
+        this->refresh_status_ = false;
+      return;
+    }
+    if (this->refresh_level_)
+    {
+      if (write_command_(CMD_GET_VENTILATION_LEVEL, nullptr, 0))
+        this->refresh_level_ = false;
+      return;
+    }
+    if (this->refresh_temperatures_)
+    {
+      if (write_command_(CMD_GET_TEMPERATURES, nullptr, 0))
+        this->refresh_temperatures_ = false;
       return;
     }
 
@@ -290,6 +311,7 @@ public:
 
   void loop() override
   {
+    this->check_communication_();
     /*
     TX:
     1. Build TX-array:
@@ -366,6 +388,9 @@ public:
 
   void set_level(int level) { set_level_(level); }
   void set_comfort_temperature(float temperature) { set_comfort_temperature_(temperature); }
+  void set_communication_timeout(uint32_t timeout) { this->communication_timeout_ = timeout; }
+  void set_connected(binary_sensor::BinarySensor *value) { this->connected = value; }
+  void set_response_age(sensor::Sensor *value) { this->response_age = value; }
 
 protected:
   // --- setter ---
@@ -388,13 +413,15 @@ protected:
     ESP_LOGI(TAG, "Setting level to: %i", level);
     {
       uint8_t command[CMD_SET_LEVEL_LENGTH] = {(uint8_t)level};
-      send_control_command_(CMD_SET_LEVEL, command, sizeof(command));
+      if (send_control_command_(CMD_SET_LEVEL, command, sizeof(command)))
+        this->refresh_level_ = true;
     }
   }
 
   void set_comfort_temperature_(float temperature)
   {
-    if (temperature < COMFOAIR_MIN_SUPPORTED_TEMP || temperature > COMFOAIR_MAX_SUPPORTED_TEMP)
+    if (!std::isfinite(temperature) || temperature < COMFOAIR_MIN_SUPPORTED_TEMP ||
+        temperature > COMFOAIR_MAX_SUPPORTED_TEMP)
     {
       ESP_LOGI(TAG, "Ignoring invalid temperature request: %.1f", temperature);
       return;
@@ -403,33 +430,46 @@ protected:
     ESP_LOGI(TAG, "Setting temperature to: %.1f", temperature);
     {
       uint8_t command[CMD_SET_COMFORT_TEMPERATURE_LENGTH] = {(uint8_t)((temperature + 20.0f) * 2.0f)};
-      send_control_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command));
+      if (send_control_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command)))
+        this->refresh_temperatures_ = true;
     }
   }
 
   void set_fan_percentages()
   {
-    if (return_air_level_absent == nullptr || return_air_level_low == nullptr || return_air_level_medium == nullptr ||
-        return_air_level_high == nullptr || supply_air_level_absent == nullptr || supply_air_level_low == nullptr ||
-        supply_air_level_medium == nullptr || supply_air_level_high == nullptr)
+    if (!this->fan_levels_valid_)
     {
-      ESP_LOGW(TAG, "Cannot sync: one or more fan-level entities are missing");
+      ESP_LOGW(TAG, "Cannot change fan settings before a complete device response");
       return;
     }
+    if (send_control_command_(CMD_SET_VENTILATION_LEVEL, this->fan_levels_, sizeof(this->fan_levels_)))
+      this->refresh_level_ = true;
+  }
 
-    uint8_t data[CMD_SET_VENTILATION_LEVEL_LENGTH];
-    data[0] = static_cast<uint8_t>(std::clamp(static_cast<int>(return_air_level_absent->state), 15, 95));
-    data[1] = static_cast<uint8_t>(std::clamp(static_cast<int>(return_air_level_low->state), 15, 95));
-    data[2] = static_cast<uint8_t>(std::clamp(static_cast<int>(return_air_level_medium->state), 15, 95));
-    data[3] = static_cast<uint8_t>(std::clamp(static_cast<int>(supply_air_level_absent->state), 15, 95));
-    data[4] = static_cast<uint8_t>(std::clamp(static_cast<int>(supply_air_level_low->state), 15, 95));
-    data[5] = static_cast<uint8_t>(std::clamp(static_cast<int>(supply_air_level_medium->state), 15, 95));
-    data[6] = static_cast<uint8_t>(std::clamp(static_cast<int>(return_air_level_high->state), 15, 95));
-    data[7] = static_cast<uint8_t>(std::clamp(static_cast<int>(supply_air_level_high->state), 15, 95));
-    data[8] = 0x00;
-
-    ESP_LOGD(TAG, "Setting fan speed percentages");
-    send_control_command_(CMD_SET_VENTILATION_LEVEL, data, sizeof(data));
+  void set_fan_percentage_(ComfoAirNumber *entity, float value)
+  {
+    if (!this->fan_levels_valid_ || !std::isfinite(value) || value < 15 || value > 95 || std::floor(value) != value)
+    {
+      ESP_LOGW(TAG, "Fan change rejected: need confirmed device settings and an integer from 15 to 95");
+      return;
+    }
+    ComfoAirNumber *entities[] = {return_air_level_absent, return_air_level_low, return_air_level_medium,
+                                  supply_air_level_absent, supply_air_level_low, supply_air_level_medium,
+                                  return_air_level_high,   supply_air_level_high};
+    for (uint8_t i = 0; i < 8; i++)
+    {
+      if (entities[i] != entity)
+        continue;
+      uint8_t candidate[sizeof(this->fan_levels_)];
+      memcpy(candidate, this->fan_levels_, sizeof(candidate));
+      candidate[i] = static_cast<uint8_t>(value);
+      if (send_control_command_(CMD_SET_VENTILATION_LEVEL, candidate, sizeof(candidate)))
+      {
+        memcpy(this->fan_levels_, candidate, sizeof(candidate));
+        this->refresh_level_ = true;
+      }
+      return;
+    }
   }
 
   // --- TX functions ---
@@ -448,6 +488,7 @@ protected:
       ESP_LOGD(TAG, "Unit bus busy, deferring ESP command 0x%02X", command);
       return false;
     }
+    this->expected_reply_ = response_for_command_(command);
 
     uint8_t message_au8_au8[MAX_MESSAGE_SIZE]{};
     message_au8_au8[0] = 0x00;
@@ -461,9 +502,6 @@ protected:
     this->last_command_sent_ = true;
     return true;
   }
-
-  // add prefix, second 0x07, checksum and postfix and transmit that data.
-  void txMessage_(uint8_t message_au8[] /*, tx_serial txPort_en */) { this->txMessageTo_(*this, message_au8); }
 
   void txMessageTo_(uart::UARTDevice &dst, uint8_t message_au8[] /*, tx_serial txPort_en */)
   {
@@ -515,38 +553,6 @@ protected:
     idx_txBuffer_u8++;
     txBuffer_au8[idx_txBuffer_u8] = 0x0F;
 
-    // todo for future use when ComfoAir and ComfoSense are both
-    // connected to an individual UART on this ESP32:
-    // Either send to CA or CS
-    //
-    // transmit
-    // idx_message_u8 = 0U;
-    // switch (txPort_en)
-    // {
-    // case SERIAL_0_PC:
-    //   while (idx_message_u8 <= idx_txBuffer_u8)
-    //   {
-    //     Serial.write(txBuffer_au8[idx_message_u8]);
-    //     idx_message_u8++;
-    //   }
-    //   break;
-    // case SERIAL_1_ComfoAir:
-    //   while (idx_message_u8 <= idx_txBuffer_u8)
-    //   {
-    //     Serial1.write(txBuffer_au8[idx_message_u8]);
-    //     idx_message_u8++;
-    //   }
-    //   break;
-    // case SERIAL_2_ComfoSense:
-    //   while (idx_message_u8 <= idx_txBuffer_u8)
-    //   {
-    //     Serial2.write(txBuffer_au8[idx_message_u8]);
-    //     idx_message_u8++;
-    //   }
-    //   break;
-    // default:
-    //   break;
-    // }
     idx_txBuffer_u8++;
     dst.write_array(txBuffer_au8, idx_txBuffer_u8);
     dst.flush();
@@ -554,27 +560,6 @@ protected:
 
   void txACK_(/* tx_serial txPort_en */)
   {
-    // send an ACK to Serial
-
-    // todo transmit
-    // switch (txPort_en)
-    // {
-    // case SERIAL_0_PC:
-    //   Serial.write(0x07);
-    //   Serial.write(0xF3);
-    //   break;
-    // case SERIAL_1_ComfoAir:
-    //   Serial1.write(0x07);
-    //   Serial1.write(0xF3);
-    //   break;
-    // case SERIAL_2_ComfoSense:
-    //   Serial2.write(0x07);
-    //   Serial2.write(0xF3);
-    //   break;
-    // default:
-    //   break;
-    // }
-
     write_byte(COMMAND_PREFIX);
     write_byte(COMMAND_HEAD_ACK);
     flush();
@@ -602,6 +587,25 @@ protected:
 
   // --- RX functions ---
 
+  bool escaped_marker_(const uint8_t *buffer, uint8_t index) const
+  {
+    uint8_t prefixes = 0;
+    while (index > 0 && buffer[--index] == COMMAND_PREFIX)
+      prefixes++;
+    return prefixes % 2 == 0;
+  }
+
+  bool rx_stop_(uint8_t *buffer, uint8_t index)
+  {
+    if (!escaped_marker_(buffer, index))
+      return true;
+    // A raw checksum of 0x07 followed by STOP also has an even prefix count.
+    uint8_t candidate[MAX_MESSAGE_SIZE];
+    memcpy(candidate, buffer, MAX_MESSAGE_SIZE);
+    const uint8_t checksum_index = isolateRxMessage_(candidate, index);
+    return checksum_index == candidate[2] + 3U && calcChecksum_(candidate) == candidate[checksum_index];
+  }
+
   rx_status checkRx_(uint8_t rxBuffer[], uint8_t *index_u8, uint8_t rc)
   {
     /* Manage and analyze rx bytes.
@@ -624,14 +628,14 @@ protected:
       return_val = RX_STATUS_RECEIVED_ACK;
       *index_u8 = 0U;
     }
-    else if (*index_u8 > 1U && rxBuffer[*index_u8 - 2] != 0x07 && rxBuffer[*index_u8 - 1] == 0x07 &&
+    else if (*index_u8 > 1U && !escaped_marker_(rxBuffer, *index_u8) && rxBuffer[*index_u8 - 1] == 0x07 &&
              rxBuffer[*index_u8] == 0xF3)
     {
       // received ACK
       return_val = RX_STATUS_RECEIVED_ACK;
       *index_u8 = 0U;
     }
-    else if (*index_u8 > 1U && rxBuffer[*index_u8 - 2] != 0x07 && rxBuffer[*index_u8 - 1] == 0x07 &&
+    else if (*index_u8 > 1U && !escaped_marker_(rxBuffer, *index_u8) && rxBuffer[*index_u8 - 1] == 0x07 &&
              rxBuffer[*index_u8] == 0xF0)
     {
       // This has to be the start of a new message.
@@ -651,7 +655,7 @@ protected:
       *index_u8 = 0U;
     }
     else if (*index_u8 >= 7U && rxBuffer[0] == 0x07 && rxBuffer[1] == 0xF0 && rxBuffer[*index_u8 - 1] == 0x07 &&
-             rxBuffer[*index_u8] == 0x0F)
+             rxBuffer[*index_u8] == 0x0F && rx_stop_(rxBuffer, *index_u8))
     {
       // new message received:
       // remove "START" and "STOP" plus
@@ -740,9 +744,8 @@ protected:
     return (write_idx_u8);
   }
 
-  void parseRxMessage_(uint8_t *message_au8)
+  bool parseRxMessage_(uint8_t *message_au8)
   {
-    status_clear_warning();
     // message_au8[0] = 0x00
     // message_au8[1] = command byte
     // message_au8[2] = data_length
@@ -751,6 +754,58 @@ protected:
     uint8_t msg_command_u8 = message_au8[COMMAND_IDX_MSG_ID - 2]; // -2 because prefix is removed from data
     uint8_t msg_length_u8 = message_au8[COMMAND_IDX_PROTOCOL_LENGTH - 2];
     uint8_t *msg_data = &message_au8[COMMAND_IDX_PROTOCOL_DATA_AREA - 2];
+
+    uint8_t minimum_length;
+    switch (msg_command_u8)
+    {
+    case RES_GET_BOOTLOADER_VERSION:
+    case RES_GET_FIRMWARE_VERSION:
+      minimum_length = 3;
+      break;
+    case RES_GET_CONNECTOR_BOARD_VERSION:
+      minimum_length = 2;
+      break;
+    case RES_GET_FAN_STATUS:
+      minimum_length = 6;
+      break;
+    case RES_GET_VALVE_STATUS:
+    case RES_GET_TEMPERATURE_STATUS:
+      minimum_length = 4;
+      break;
+    case RES_GET_BYPASS_CONTROL_STATUS:
+      minimum_length = 7;
+      break;
+    case RES_GET_SENSOR_DATA:
+      minimum_length = 1;
+      break;
+    case RES_GET_VENTILATION_LEVEL:
+      minimum_length = 12;
+      break;
+    case RES_GET_FAULTS:
+    case RES_GET_TEMPERATURES:
+      minimum_length = 9;
+      break;
+    case RES_GET_STATUS:
+      minimum_length = 11;
+      break;
+    case RES_GET_OPERATION_HOURS:
+      minimum_length = 20;
+      break;
+    case RES_GET_PREHEATING_STATUS:
+      minimum_length = 6;
+      break;
+    case RES_GET_TIME_DELAY:
+      minimum_length = 8;
+      break;
+    default:
+      return false;
+    }
+    if (message_au8[0] != 0 || msg_length_u8 < minimum_length)
+    {
+      ESP_LOGW(TAG, "Ignoring response 0x%02X with %u data bytes, need %u", msg_command_u8, msg_length_u8,
+               minimum_length);
+      return false;
+    }
 
     switch (msg_command_u8)
     {
@@ -909,6 +964,21 @@ protected:
         break;
       }
 
+      bool fan_write_queued = false;
+      for (uint8_t i = 0; i < this->queued_command_count_; i++)
+        fan_write_queued |= this->queued_commands_[i].command == CMD_SET_VENTILATION_LEVEL;
+      if (!fan_write_queued)
+      {
+        const uint8_t indexes[] = {0, 1, 2, 3, 4, 5, 10, 11};
+        this->fan_levels_valid_ = true;
+        for (uint8_t i = 0; i < 8; i++)
+        {
+          this->fan_levels_[i] = msg_data[indexes[i]];
+          this->fan_levels_valid_ &= this->fan_levels_[i] <= 100;
+        }
+        this->fan_levels_[8] = 0;
+      }
+
       if (return_air_level_absent != nullptr)
         return_air_level_absent->publish_state(msg_data[0]);
       if (return_air_level_low != nullptr)
@@ -937,12 +1007,7 @@ protected:
     }
     case RES_GET_FAULTS:
     {
-      // Bytes 0..8 (A/E errors and filter) are required. EA (byte 9) and high A (byte 13) are optional.
-      if (msg_length_u8 < 9)
-      {
-        ESP_LOGW(TAG, "Ignoring fault response with %u data bytes, need at least 9", msg_length_u8);
-        break;
-      }
+      // EA (byte 9) and high A (byte 13) are optional.
       const uint8_t status = msg_data[8];
       if (filter_status != nullptr)
       {
@@ -970,7 +1035,6 @@ protected:
     {
       // comfort temperature
       target_temperature = (float)msg_data[0] / 2.0f - 20.0f;
-      publish_state();
 
       // T1 / outside air
       if (outside_air_temperature != nullptr && msg_data[5] & 0x01)
@@ -983,10 +1047,11 @@ protected:
         supply_air_temperature->publish_state((float)msg_data[2] / 2.0f - 20.0f);
       }
       // T3 / exhaust air
-      if (return_air_temperature != nullptr && msg_data[5] & 0x04)
+      if (msg_data[5] & 0x04)
       {
-        return_air_temperature->publish_state((float)msg_data[3] / 2.0f - 20.0f);
         current_temperature = (float)msg_data[3] / 2.0f - 20.0f;
+        if (return_air_temperature != nullptr)
+          return_air_temperature->publish_state(current_temperature);
       }
       // T4 / continued air
       if (exhaust_air_temperature != nullptr && msg_data[5] & 0x08)
@@ -1008,6 +1073,7 @@ protected:
       {
         kitchen_hood_temperature->publish_state((float)msg_data[8] / 2.0f - 20.0f);
       }
+      publish_state();
       break;
     }
     case RES_GET_STATUS:
@@ -1325,9 +1391,82 @@ protected:
       break;
     }
     }
+    this->last_valid_response_ = millis();
+    this->has_valid_response_ = true;
+    return true;
   }
 
   // --- getter ---
+
+  void check_communication_()
+  {
+    const uint32_t now = millis();
+    if (now - this->last_health_check_ < 1000)
+      return;
+    this->last_health_check_ = now;
+    const uint32_t age = now - (this->has_valid_response_ ? this->last_valid_response_ : this->started_at_);
+    const bool online = this->has_valid_response_ && age <= this->communication_timeout_;
+    if (this->connected != nullptr)
+      this->connected->publish_state(online);
+    if (this->response_age != nullptr)
+      this->response_age->publish_state(this->has_valid_response_ ? age / 1000.0f : NAN);
+    if (online)
+    {
+      this->status_clear_warning();
+      this->communication_timed_out_ = false;
+    }
+    else if (age > this->communication_timeout_ && !this->communication_timed_out_)
+    {
+      this->communication_timed_out_ = true;
+      this->status_set_warning("No valid ComfoAir response");
+      this->fan_levels_valid_ = false;
+      this->status_payload_valid_ = false;
+      sensor::Sensor *measurements[] = {intake_fan_speed,
+                                        exhaust_fan_speed,
+                                        intake_fan_speed_rpm,
+                                        exhaust_fan_speed_rpm,
+                                        ventilation_level,
+                                        outside_air_temperature,
+                                        supply_air_temperature,
+                                        return_air_temperature,
+                                        exhaust_air_temperature,
+                                        enthalpy_temperature,
+                                        ewt_temperature,
+                                        reheating_temperature,
+                                        kitchen_hood_temperature,
+                                        return_air_level,
+                                        supply_air_level,
+                                        bypass_factor,
+                                        bypass_step,
+                                        bypass_correction,
+                                        bypass_open_hours,
+                                        motor_current_bypass,
+                                        motor_current_preheating,
+                                        preheating_hours,
+                                        level0_hours,
+                                        level1_hours,
+                                        level2_hours,
+                                        level3_hours,
+                                        frost_protection_hours,
+                                        frost_protection_minutes,
+                                        filter_hours,
+                                        bypass_valve,
+                                        bathroom_switch_on_delay_minutes,
+                                        bathroom_switch_off_delay_minutes,
+                                        l1_switch_off_delay_minutes,
+                                        boost_ventilation_minutes,
+                                        filter_warning_weeks,
+                                        rf_high_time_short_minutes,
+                                        rf_high_time_long_minutes,
+                                        extractor_hood_switch_off_delay_minutes};
+      for (auto *measurement : measurements)
+        if (measurement != nullptr)
+          measurement->publish_state(NAN);
+      this->current_temperature = NAN;
+      this->target_temperature = NAN;
+      this->publish_state();
+    }
+  }
 
   void append_fault_bits_(std::string &out, uint8_t bits, const char *prefix, int start_num) const
   {
@@ -1375,7 +1514,8 @@ protected:
 
   void get_valve_status_()
   {
-    if (bypass_valve != nullptr || bypass_valve_open != nullptr || preheating_state != nullptr)
+    if (bypass_valve != nullptr || bypass_valve_open != nullptr || preheating_state != nullptr ||
+        motor_current_bypass != nullptr || motor_current_preheating != nullptr)
     {
       ESP_LOGD(TAG, "getting valve status");
       write_command_(CMD_GET_VALVE_STATUS, nullptr, 0);
@@ -1397,16 +1537,6 @@ protected:
     {
       ESP_LOGD(TAG, "getting bypass control");
       write_command_(CMD_GET_BYPASS_CONTROL_STATUS, nullptr, 0);
-    }
-  }
-
-  void get_temperature_()
-  {
-    if (outside_air_temperature != nullptr || supply_air_temperature != nullptr || return_air_temperature != nullptr ||
-        outside_air_temperature != nullptr)
-    {
-      ESP_LOGD(TAG, "getting temperature");
-      write_command_(CMD_GET_TEMPERATURE_STATUS, nullptr, 0);
     }
   }
 
@@ -1554,7 +1684,45 @@ protected:
     return true;
   }
 
-  void release_bus_() { this->bus_owner_ = BusOwner::IDLE; }
+  static uint8_t response_for_command_(uint8_t command)
+  {
+    switch (command)
+    {
+    case CMD_GET_BOOTLOADER_VERSION:
+    case CMD_GET_FIRMWARE_VERSION:
+    case CMD_GET_CONNECTOR_BOARD_VERSION:
+    case CMD_GET_INPUTS:
+    case CMD_GET_FAN_STATUS:
+    case CMD_GET_VALVE_STATUS:
+    case CMD_GET_TEMPERATURE_STATUS:
+    case CMD_GET_BUTTON_STATUS:
+    case CMD_GET_ANALOG_INPUTS:
+    case CMD_GET_SENSOR_DATA:
+    case CMD_GET_ANALOG_VALUES:
+    case CMD_GET_TIME_DELAY:
+    case CMD_GET_VENTILATION_LEVEL:
+    case CMD_GET_TEMPERATURES:
+    case CMD_GET_STATUS:
+    case CMD_GET_FAULTS:
+    case CMD_GET_OPERATION_HOURS:
+    case CMD_GET_BYPASS_CONTROL_STATUS:
+    case CMD_GET_PREHEATING_STATUS:
+    case CMD_GET_RF_STATUS:
+    case CMD_GET_LAST_8_TIMES_PREHEATING:
+    case CMD_GET_DATA:
+    case CMD_GET_CC_EASE_PARAMETERS:
+    case CMD_GET_RF_COMMAND:
+      return command + 1;
+    default:
+      return 0;
+    }
+  }
+
+  void release_bus_()
+  {
+    this->bus_owner_ = BusOwner::IDLE;
+    this->expected_reply_ = 0;
+  }
 
   void send_ack_to_(uart::UARTDevice &dst)
   {
@@ -1585,6 +1753,7 @@ protected:
     }
     if (!this->try_acquire_bus_(BusOwner::PROXY))
       return;
+    this->expected_reply_ = response_for_command_(this->pending_proxy_msg_[1]);
     this->txMessageTo_(*this, this->pending_proxy_msg_);
     this->proxy_msg_pending_ = false;
   }
@@ -1619,8 +1788,12 @@ protected:
             this->send_ack_to_(this->uart_proxy_);
             this->last_display_frame_ = millis();
           }
-          this->release_bus_();
-          this->flush_pending_proxy_command_();
+          // Read requests complete on their reply, not on an intermediate ACK.
+          if (this->expected_reply_ == 0)
+          {
+            this->release_bus_();
+            this->flush_pending_proxy_command_();
+          }
         }
         break;
       case RX_STATUS_RECEIVED_MESSAGE:
@@ -1633,6 +1806,7 @@ protected:
           this->flush_queued_commands_();
           if (this->try_acquire_bus_(BusOwner::PROXY))
           {
+            this->expected_reply_ = response_for_command_(this->pending_proxy_msg_[1]);
             this->txMessageTo_(*this, this->pending_proxy_msg_);
             this->proxy_msg_pending_ = false;
           }
@@ -1651,8 +1825,11 @@ protected:
             this->txMessageTo_(this->uart_proxy_, buf);
             this->last_display_frame_ = millis();
           }
-          this->release_bus_();
-          this->flush_pending_proxy_command_();
+          if (this->expected_reply_ == 0 || buf[1] == this->expected_reply_)
+          {
+            this->release_bus_();
+            this->flush_pending_proxy_command_();
+          }
         }
         break;
       case RX_STATUS_RECEIVED_INVALID_MESSAGE:
@@ -1679,6 +1856,7 @@ protected:
   bool has_proxy_uart_{false};
   bool last_command_sent_{true};
   BusOwner bus_owner_{BusOwner::IDLE};
+  uint8_t expected_reply_{0};
   uint32_t bus_busy_since_{0};
   uint32_t last_unit_rx_{0};
   uint32_t last_display_frame_{0};
@@ -1686,6 +1864,17 @@ protected:
   uint8_t queued_command_count_{0};
   uart::UARTDevice uart_proxy_;
   int8_t update_counter_{-10};
+  bool refresh_level_{false};
+  bool refresh_temperatures_{false};
+  bool refresh_status_{false};
+  uint8_t fan_levels_[CMD_SET_VENTILATION_LEVEL_LENGTH]{};
+  bool fan_levels_valid_{false};
+  uint32_t started_at_{0};
+  uint32_t last_valid_response_{0};
+  uint32_t last_health_check_{0};
+  uint32_t communication_timeout_{90000};
+  bool has_valid_response_{false};
+  bool communication_timed_out_{false};
   uint8_t status_payload_[8]{0};
   bool status_payload_valid_{false};
   uint8_t current_unit_size_{0};
@@ -1697,6 +1886,8 @@ protected:
   const char *name{0};
 
 public:
+  binary_sensor::BinarySensor *connected{nullptr};
+  sensor::Sensor *response_age{nullptr};
   text_sensor::TextSensor *type{nullptr};
   text_sensor::TextSensor *size{nullptr};
   text_sensor::TextSensor *filter_status{nullptr};
@@ -2100,12 +2291,6 @@ inline bool ComfoAirComponent::set_unit_size(uint8_t raw_size)
     return false;
   }
 
-  if (status_payload_[3] == raw_size)
-  {
-    publish_size_entities_(raw_size);
-    return true;
-  }
-
   uint8_t payload[sizeof(status_payload_)];
   memcpy(payload, status_payload_, sizeof(status_payload_));
   payload[3] = raw_size;
@@ -2117,8 +2302,7 @@ inline bool ComfoAirComponent::set_unit_size(uint8_t raw_size)
     return false;
   }
 
-  status_payload_[3] = raw_size;
-  publish_size_entities_(raw_size);
+  this->refresh_status_ = true;
 
   return true;
 }
@@ -2176,10 +2360,9 @@ inline void ComfoAirSizeSelect::control(const std::string &value)
 
 inline void ComfoAirNumber::control(float value)
 {
-  this->publish_state(value);
   if (this->parent_ != nullptr)
   {
-    this->parent_->set_fan_percentages();
+    this->parent_->set_fan_percentage_(this, value);
   }
 }
 

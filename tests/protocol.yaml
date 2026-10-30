@@ -1,5 +1,8 @@
 esphome:
   name: comfoair-protocol
+  build_flags:
+    - -fsanitize=address,undefined
+    - -fno-omit-frame-pointer
   includes:
     - protocol_test.h
   on_boot:
