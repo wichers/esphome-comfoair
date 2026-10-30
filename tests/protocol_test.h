@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esphome/components/comfoair/comfoair.h"
+#include <algorithm>
 #include <cstdlib>
 #include <cstdio>
 #include <deque>
@@ -46,6 +47,7 @@ class TestComfoAir : public esphome::comfoair::ComfoAirComponent {
   using ComfoAirComponent::bootloader_version_;
   using ComfoAirComponent::firmware_version_;
   using ComfoAirComponent::connector_board_version_;
+  using ComfoAirComponent::update_counter_;
 };
 
 // Synthetic fixtures based on registers.h; these are not captured unit traffic.
@@ -179,6 +181,76 @@ inline void run_decoder_tests() {
   CHECK(filter.state == "Unknown" && full.state);
   decode(RES_GET_FAULTS, {0, 0, 0, 0, 0, 0, 0, 0, 0});
   CHECK(filter.state == "Ok" && !full.state);
+
+  // Fault bits: A1-A8 (byte 0), E1-E8 (byte 1), EA1-EA8 (byte 9), A9-A15 and A0 (byte 13).
+  // The 0xFF filler after the payload shows reads past the declared length.
+  auto decode_in_buffer = [&](uint8_t command, std::initializer_list<uint8_t> payload) {
+    std::vector<uint8_t> message(comfoair::MAX_MESSAGE_SIZE, 0xFF);
+    message[0] = 0;
+    message[1] = command;
+    message[2] = uint8_t(payload.size());
+    std::copy(payload.begin(), payload.end(), message.begin() + 3);
+    component.parseRxMessage_(message.data());
+  };
+  text_sensor::TextSensor errors;
+  component.error_status = &errors;
+  decode_in_buffer(RES_GET_FAULTS, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+  CHECK(errors.state == "None");
+  decode_in_buffer(RES_GET_FAULTS, {0x81, 0x02, 0, 0, 0, 0, 0, 0, 0, 0x04, 0, 0, 0, 0xC1, 0, 0, 0});
+  CHECK(errors.state == "A1, A8, E2, EA3, A9, A15, A0");
+  decode_in_buffer(RES_GET_FAULTS, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0, 0, 0});
+  CHECK(errors.state == "A9");
+  decode_in_buffer(RES_GET_FAULTS, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x40, 0, 0, 0});
+  CHECK(errors.state == "A15");
+  decode_in_buffer(RES_GET_FAULTS, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80, 0, 0, 0});
+  CHECK(errors.state == "A0");
+  // Without the optional bytes, EA and high A are not read.
+  decode_in_buffer(RES_GET_FAULTS, {0, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x01});
+  CHECK(errors.state == "E1, EA1");
+  decode_in_buffer(RES_GET_FAULTS, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
+  CHECK(errors.state == "A1" && filter.state == "Ok" && !full.state);
+
+  // A short fault payload in a valid frame gets an ACK but changes no state.
+  for (uint8_t length : {0, 8}) {
+    const std::vector<uint8_t> payload(length, 0x01);
+    uart.output.clear();
+    component.write_command_(RES_GET_FAULTS, payload.data(), length);
+    uart.input.assign(uart.output.begin(), uart.output.end());
+    uart.output.clear();
+    component.loop();
+    CHECK(uart.output == std::vector<uint8_t>({7, 0xF3}));
+    CHECK(errors.state == "A1" && filter.state == "Ok" && !full.state);
+  }
+
+  // The reset buttons send command 0xDB with different payloads.
+  comfoair::ComfoAirFilterResetButton filter_reset;
+  comfoair::ComfoAirErrorResetButton error_reset;
+  component.set_filter_reset(&filter_reset);
+  component.set_error_reset(&error_reset);
+  uart.output.clear();
+  filter_reset.press();
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_RESET_AND_SELF_TEST, 4,
+        0, 0, 0, 1, uint8_t(0xAD + CMD_RESET_AND_SELF_TEST + 4 + 1), 7, 0x0F}));
+  uart.output.clear();
+  error_reset.press();
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_RESET_AND_SELF_TEST, 4,
+        1, 0, 0, 0, uint8_t(0xAD + CMD_RESET_AND_SELF_TEST + 4 + 1), 7, 0x0F}));
+
+  // Update slot 5 polls the faults when only error_status is configured.
+  {
+    TestUART poll_uart;
+    TestComfoAir poller;
+    poller.set_uart_parent(&poll_uart);
+    poller.update_counter_ = 5;
+    poller.update();
+    CHECK(poll_uart.output.empty());
+    text_sensor::TextSensor only_errors;
+    poller.error_status = &only_errors;
+    poller.update_counter_ = 5;
+    poller.update();
+    CHECK(poll_uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_GET_FAULTS, 0,
+          uint8_t(0xAD + CMD_GET_FAULTS), 7, 0x0F}));
+  }
   component.type = &type;
   component.size = &size;
   component.preheating_present = &preheat_present;

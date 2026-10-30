@@ -37,6 +37,11 @@ They check presence masks and unknown binary/text values as well as climate
 fan commands for all five modes and the encoded target temperature. These
 are synthetic fixtures from `registers.h`, not captured device traffic.
 
+Fault fixtures decode A, E, EA and high-A bits (including A9, A15 and A0) with
+and without the optional bytes. A valid frame with a short fault payload goes
+through the receive loop and must not change any state. The tests also check
+the two reset-button payloads and that `error_status` alone polls the faults.
+
 The host harness targets ESPHome 2026.10.0's UART C++ API. Configuration and
 firmware CI separately target 2026.8.1 and 2026.10.0, covering ESP32-S3/ESP-IDF,
 ESP32/ESP-IDF, ESP32/Arduino, ESP8266, and an entity-minimal configuration.

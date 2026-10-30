@@ -46,6 +46,8 @@ ComfoAirComponent = comfoair_ns.class_(
 )
 ComfoAirNumber = comfoair_ns.class_("ComfoAirNumber", number.Number)
 ComfoAirSyncButton = comfoair_ns.class_("ComfoAirSyncButton", button.Button)
+ComfoAirFilterResetButton = comfoair_ns.class_("ComfoAirFilterResetButton", button.Button)
+ComfoAirErrorResetButton = comfoair_ns.class_("ComfoAirErrorResetButton", button.Button)
 # pylint: enable=invalid-name
 
 DEPENDENCIES = ["uart"]
@@ -78,6 +80,9 @@ CONF_SUPPLY_AIR_LEVEL = "supply_air_level"
 CONF_SUPPLY_FAN_ACTIVE = "supply_fan_active"
 CONF_FILTER_STATUS = "filter_status"
 CONF_FILTER_STATUS_FULL = "filter_status_full"
+CONF_ERROR_STATUS = "error_status"
+CONF_FILTER_RESET = "filter_reset"
+CONF_ERROR_RESET = "error_reset"
 CONF_BYPASS_PRESENT = "bypass_present"
 CONF_ENTHALPY_PRESENT = "enthalpy_present"
 CONF_EWT_PRESENT = "ewt_present"
@@ -229,6 +234,7 @@ helper_comfoair = {
         CONF_TYPE,
         CONF_SIZE,
         CONF_FILTER_STATUS,
+        CONF_ERROR_STATUS,
         CONF_FROST_PROTECTION_LEVEL,
         CONF_PREHEATING_VALVE,
     ],
@@ -247,6 +253,8 @@ helper_comfoair = {
     ],
     "button": [
         CONF_SYNC_FAN_LEVELS,
+        CONF_FILTER_RESET,
+        CONF_ERROR_RESET,
     ],
 }
 
@@ -284,6 +292,7 @@ comfoair_sensors_schemas = cv.Schema(
         cv.Optional(CONF_TYPE): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_SIZE): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_FILTER_STATUS): text_sensor.text_sensor_schema(),
+        cv.Optional(CONF_ERROR_STATUS): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_FROST_PROTECTION_LEVEL): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_PREHEATING_VALVE): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_SIZE_SELECT): select.select_schema(
@@ -537,6 +546,14 @@ comfoair_sensors_schemas = cv.Schema(
             ComfoAirSyncButton,
             icon="mdi:sync",
         ).extend(),
+        cv.Optional(CONF_FILTER_RESET): button.button_schema(
+            ComfoAirFilterResetButton,
+            icon="mdi:air-filter",
+        ),
+        cv.Optional(CONF_ERROR_RESET): button.button_schema(
+            ComfoAirErrorResetButton,
+            icon="mdi:alert-circle-check",
+        ),
     }
 )
 
