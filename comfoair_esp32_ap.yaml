@@ -7,6 +7,9 @@ esp32:
   board: esp32dev
 
 esphome:
+  project:
+    name: wichers.comfoair
+    version: "1.0.0"
   name: ${node_name}
   comment: ${device_name}
   friendly_name: "${device_name}"
@@ -18,6 +21,8 @@ external_components:
   - source:
       type: git
       url: https://github.com/wichers/esphome-comfoair
+      ref: v1.0.0
+    refresh: never
     components: [comfoair]
 
 wifi:
@@ -25,7 +30,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: ${node_name}-setup
-    password: ${node_name}setup
+    password: !secret wifi_fallback_ap_key
 
 captive_portal:
 
@@ -35,11 +40,17 @@ logger:
 
 # Enable Home Assistant API
 api:
+  encryption:
+    key: !secret comfoair_api_encryption_key
 
 ota:
-  platform: esphome
+  - platform: esphome
+    password: !secret comfoair_ota_password
 
 web_server:
+  auth:
+    username: !secret web_server_username
+    password: !secret web_server_password
 
 output:
   - platform: gpio
@@ -91,6 +102,7 @@ binary_sensor:
 switch:
   - platform: factory_reset
     name: Restart with Factory Default Settings
+    disabled_by_default: true
 
 text_sensor:
   - platform: version
@@ -105,19 +117,21 @@ uart:
   # Optional: original wall controller (CCEase / ComfoSense) on a second UART.
   # - id: uart_proxy
   #   baud_rate: 9600
-  #   tx_pin: 19
-  #   rx_pin: 18
+  #   tx_pin: 25
+  #   rx_pin: 26
 
 comfoair:
   name: "${device_name}"
   uart_id: uart_bus
   # proxy_uart: uart_proxy
+  connected:
+    name: Ventilation communication
+  response_age:
+    name: Ventilation response age
   type:
     name: "Type"
   size:
     name: "Size"
-  size_select:
-    name: "unit_size"
   intake_fan_speed:
     name: "Supply air level"
   exhaust_fan_speed:

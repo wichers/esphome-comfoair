@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible component or serial communication problem.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Installation
+      description: Component tag/commit, ESPHome version, board/framework, unit model/firmware, and whether proxy_uart is enabled.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Include the steps to reproduce and communication status/response age if available.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted YAML and relevant DEBUG logs
+      description: Remove all Wi-Fi, API, OTA and MQTT credentials. Do not attach secrets.yaml.
+    validations:
+      required: true

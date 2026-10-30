@@ -1,6 +1,9 @@
 esp8266:
   board: esp01_1m
 esphome:
+  project:
+    name: wichers.comfoair
+    version: "1.0.0"
   name: comfoair
   # includes:
   #   - comfoair.h
@@ -9,11 +12,13 @@ external_components:
   - source:
       type: git
       url: https://github.com/wichers/esphome-comfoair
+      ref: v1.0.0
+    refresh: never
     components: [comfoair]
 
 wifi:
-  ssid: 'your-wifi-ssid-here'
-  password: 'put-your-wifi-password-here'
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
 # Disable uart logging
 logger:
@@ -21,9 +26,12 @@ logger:
 
 # Enable Home Assistant API
 api:
+  encryption:
+    key: !secret comfoair_api_encryption_key
 
 ota:
-  platform: esphome
+  - platform: esphome
+    password: !secret comfoair_ota_password
 
 sensor:
 binary_sensor:
@@ -44,12 +52,14 @@ comfoair:
   id: "comfoair_climate"
   uart_id: uart_bus
   # proxy_uart: uart_proxy
+  connected:
+    name: Ventilation communication
+  response_age:
+    name: Ventilation response age
   type:
     name: "type"
   size:
     name: "size"
-  size_select:
-    name: "unit_size"
   intake_fan_speed:
     name: "intake_fan_speed"
   exhaust_fan_speed:

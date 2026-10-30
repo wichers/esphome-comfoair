@@ -9,3 +9,6 @@ secrets.yaml
 .esphome
 __pycache__
 .DS_Store
+
+.venv/
+.ruff_cache/
