@@ -23,14 +23,11 @@ from esphome.const import (
     CONF_UART_ID,
     DEVICE_CLASS_CURRENT,
     DEVICE_CLASS_EMPTY,
-    DEVICE_CLASS_SPEED,
     DEVICE_CLASS_TEMPERATURE,
-    DEVICE_CLASS_VOLUME,
     ICON_FAN,
     STATE_CLASS_MEASUREMENT,
     UNIT_AMPERE,
     UNIT_CELSIUS,
-    UNIT_CUBIC_METER,
     UNIT_HOUR,
     UNIT_MINUTE,
     UNIT_PERCENT,
@@ -300,20 +297,17 @@ comfoair_sensors_schemas = cv.Schema(
             ComfoAirSizeSelect
         ).extend(),
 
+        # Fan speeds in % and RPM. Home Assistant's speed class is for m/s or km/h.
         cv.Optional(CONF_INTAKE_FAN_SPEED): _measurement_schema(
-            device_class=DEVICE_CLASS_SPEED,
             unit_of_measurement=UNIT_PERCENT,
         ),
         cv.Optional(CONF_EXHAUST_FAN_SPEED): _measurement_schema(
-            device_class=DEVICE_CLASS_SPEED,
             unit_of_measurement=UNIT_PERCENT,
         ),
         cv.Optional(CONF_INTAKE_FAN_SPEED_RPM): _measurement_schema(
-            device_class=DEVICE_CLASS_SPEED,
             unit_of_measurement=UNIT_REVOLUTIONS_PER_MINUTE,
         ),
         cv.Optional(CONF_EXHAUST_FAN_SPEED_RPM): _measurement_schema(
-            device_class=DEVICE_CLASS_SPEED,
             unit_of_measurement=UNIT_REVOLUTIONS_PER_MINUTE,
         ),
         cv.Optional(CONF_VENTILATION_LEVEL): _measurement_schema(),
@@ -357,25 +351,17 @@ comfoair_sensors_schemas = cv.Schema(
             unit_of_measurement=UNIT_CELSIUS,
             accuracy_decimals=1,
         ),
+        # Current fan levels (0xCE bytes 6-7) are percentages, not air volumes.
         cv.Optional(CONF_RETURN_AIR_LEVEL): _measurement_schema(
-            device_class=DEVICE_CLASS_VOLUME,
-            unit_of_measurement=UNIT_CUBIC_METER,
-            accuracy_decimals=1,
+            unit_of_measurement=UNIT_PERCENT,
         ),
         cv.Optional(CONF_SUPPLY_AIR_LEVEL): _measurement_schema(
-            device_class=DEVICE_CLASS_VOLUME,
-            unit_of_measurement=UNIT_CUBIC_METER,
-            accuracy_decimals=1,
+            unit_of_measurement=UNIT_PERCENT,
         ),
-        cv.Optional(CONF_BYPASS_FACTOR): _measurement_schema(
-            device_class=DEVICE_CLASS_VOLUME,
-        ),
-        cv.Optional(CONF_BYPASS_STEP): _measurement_schema(
-            device_class=DEVICE_CLASS_VOLUME,
-        ),
-        cv.Optional(CONF_BYPASS_CORRECTION): _measurement_schema(
-            device_class=DEVICE_CLASS_VOLUME,
-        ),
+        # Bypass control values (0xE0) are unitless controller numbers.
+        cv.Optional(CONF_BYPASS_FACTOR): _measurement_schema(),
+        cv.Optional(CONF_BYPASS_STEP): _measurement_schema(),
+        cv.Optional(CONF_BYPASS_CORRECTION): _measurement_schema(),
         cv.Optional(CONF_BYPASS_OPEN_HOURS): _measurement_schema(
             unit_of_measurement=UNIT_HOUR,
         ),
@@ -416,7 +402,6 @@ comfoair_sensors_schemas = cv.Schema(
         ),
 
         cv.Optional(CONF_BYPASS_VALVE): _measurement_schema(
-            device_class=DEVICE_CLASS_VOLUME,
             unit_of_measurement=UNIT_PERCENT,
         ),
 
