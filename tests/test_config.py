@@ -35,7 +35,7 @@ class ConfigTests(unittest.TestCase):
         config["uart"] = [config["uart"], proxy_uart]
         config["comfoair"]["proxy_uart"] = proxy.get("use", "uart_proxy")
 
-    def run_config(self, *, uart=None, proxy=None, select=None, entities=None, generate=False):
+    def run_config(self, *, uart=None, proxy=None, entities=None, generate=False):
         """Run an isolated config, optionally returning its generated C++."""
         config = yaml.safe_load((ROOT / "tests/minimal.yaml").read_text())
         config["external_components"][0]["source"]["path"] = str(ROOT / "components")
@@ -47,8 +47,6 @@ class ConfigTests(unittest.TestCase):
                     config["uart"][key] = value
         if proxy is not None:
             self.add_proxy(config, proxy)
-        if select is not None:
-            config["comfoair"]["size_select"] = select
         if entities:
             config["comfoair"].update(entities)
         with tempfile.TemporaryDirectory() as directory:
@@ -75,7 +73,8 @@ class ConfigTests(unittest.TestCase):
         """Existing named and ID-only selects still generate code."""
         for select in ({"name": "Unit size"}, {"id": "unit_size"}):
             with self.subTest(select=select):
-                result, generated = self.run_config(select=select, generate=True)
+                result, generated = self.run_config(entities={"size_select": select},
+                                                    generate=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("set_size_select", generated)
 
