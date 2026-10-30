@@ -363,7 +363,26 @@ inline void run_decoder_tests()
   CHECK(outside.state == -20 && supply.state == 0);
   CHECK(returning.state == 20 && exiting.state == 20.5f);
   decode(RES_GET_SENSOR_DATA, {90});
+  CHECK(std::isnan(enthalpy.state)); // No status baseline yet.
+  // Presence is decoded independently of an optional enthalpy_present entity.
+  CHECK(component.enthalpy_present == nullptr);
+  decode(RES_GET_STATUS, {0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0});
+  decode(RES_GET_SENSOR_DATA, {0});
+  CHECK(std::isnan(enthalpy.state)); // Absent must not appear as -20 degrees.
+  decode(RES_GET_STATUS, {0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0});
+  decode(RES_GET_SENSOR_DATA, {0});
+  CHECK(enthalpy.state == -20); // Zero is a valid reading when a sensor is present.
+  decode(RES_GET_SENSOR_DATA, {90});
   CHECK(enthalpy.state == 25);
+  decode(RES_GET_STATUS, {0, 0, 1, 1, 0, 0, 0, 0, 0, 2, 0});
+  CHECK(std::isnan(enthalpy.state)); // Exchanger without sensor clears the old reading.
+  decode(RES_GET_SENSOR_DATA, {90});
+  CHECK(std::isnan(enthalpy.state));
+  decode(RES_GET_STATUS, {0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0});
+  decode(RES_GET_SENSOR_DATA, {90});
+  CHECK(enthalpy.state == 25); // Recovery after a valid presence response.
+  decode(RES_GET_STATUS, {0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0});
+  CHECK(std::isnan(enthalpy.state));
   decode(RES_GET_TEMPERATURES, {82, 42, 62, 84, 86, 0x7F, 88, 90, 92});
   CHECK(component.target_temperature == 21 && component.current_temperature == 22);
   CHECK(outside.state == 1 && supply.state == 11 && returning.state == 22);
