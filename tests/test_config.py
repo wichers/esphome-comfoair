@@ -108,8 +108,40 @@ class ConfigTests(unittest.TestCase):
         result, _ = self.run_config(entities=entities)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         validated = yaml.safe_load(result.stdout)["comfoair"]
+        counters = {
+            "level0_hours", "level1_hours", "level2_hours", "level3_hours",
+            "bypass_open_hours", "preheating_hours", "frost_protection_hours",
+            "filter_hours",
+        }
         for key in helper_comfoair["sensor"]:
-            self.assertEqual(validated[key]["state_class"], "measurement")
+            with self.subTest(state_class=key):
+                expected = "total_increasing" if key in counters else "measurement"
+                self.assertEqual(validated[key]["state_class"], expected)
+        # Durations and binary states use HA device classes; units are unchanged.
+        device_classes = {
+            **{key: "duration" for key in counters},
+            "response_age": "duration",
+            "frost_protection_minutes": "duration",
+            "bathroom_switch_on_delay_minutes": "duration",
+            "boost_ventilation_minutes": "duration",
+            "bypass_valve_open": "opening",
+            "filter_status_full": "problem",
+            "supply_fan_active": "running",
+            "frost_protection_active": "cold",
+            "preheating_state": "heat",
+            "preheating_active": "heat",
+        }
+        for key, device_class in device_classes.items():
+            with self.subTest(device_class=key):
+                self.assertEqual(validated[key].get("device_class"), device_class)
+        for key in counters:
+            self.assertEqual(validated[key]["unit_of_measurement"], "h")
+        # Entities without a device class icon get an mdi icon by default.
+        for key in ("intake_fan_speed", "bypass_valve", "filter_status", "error_status",
+                    "summer_mode", "p10_active", "bypass_present", "filter_warning_weeks"):
+            with self.subTest(icon=key):
+                self.assertTrue(validated[key].get("icon", "").startswith("mdi:"))
+        self.assertEqual(validated["icon"], "mdi:hvac")
         for key in helper_comfoair["number"]:
             self.assertNotIn("initial_value", validated[key])
             self.assertEqual(validated[key]["entity_category"], "config")

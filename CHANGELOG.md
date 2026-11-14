@@ -28,6 +28,15 @@ component changes; ESPHome itself has a separate version.
 - Removed the unused `set_name()` overrides and `name` member.
 - The unit-size select implements ESPHome's preferred index-based `control()`
   instead of the string overload, avoiding a string lookup per change.
+- Entities have default icons, and HA device classes where one fits: `duration`
+  for the hour and minute values and `response_age`; `opening` for
+  `bypass_valve_open`; `problem` for `filter_status_full`; `running` for
+  `supply_fan_active`; `cold` for `frost_protection_active`; `heat` for
+  `preheating_state` and `preheating_active`. Icons, device classes and
+  categories set in YAML still take precedence.
+- Operating-hour counters use state class `total_increasing` instead of
+  `measurement`, because they only count up.
+- `frost_protection_minutes` and `filter_warning_weeks` are diagnostic entities.
 
 ### User actions
 
@@ -36,6 +45,13 @@ component changes; ESPHome itself has a separate version.
 - After the `filter_warning_weeks` unit change, Home Assistant pauses that
   sensor's long-term statistics and raises a Repairs issue. Choose to update the
   unit of the historic values to keep the history (1 `weeks` = 1 `w`).
+- Binary sensors with a new device class show HA's matching state names, for
+  example Open/Closed for `bypass_valve_open` and Problem/OK for
+  `filter_status_full`. Automations compare the unchanged `on`/`off` states.
+- The operating-hour counters' long-term statistics are kept as running totals
+  from the update on; earlier statistics keep their min/max/mean values.
+- `frost_protection_minutes` and `filter_warning_weeks` move to the device's
+  Diagnostic section in Home Assistant.
 
 ## [1.0.0]
 
