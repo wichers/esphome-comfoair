@@ -35,8 +35,11 @@ class ConfigTests(unittest.TestCase):
         config["uart"] = [config["uart"], proxy_uart]
         config["comfoair"]["proxy_uart"] = proxy.get("use", "uart_proxy")
 
-    def run_config(self, *, uart=None, proxy=None, entities=None, generate=False):
-        """Run an isolated config, optionally returning its generated C++."""
+    def run_config(self, *, uart=None, proxy=None, entities=None, remove=(), generate=False):
+        """Run an isolated config, optionally returning its generated C++.
+
+        Keys in remove are deleted from the comfoair block.
+        """
         config = yaml.safe_load((ROOT / "tests/minimal.yaml").read_text())
         config["external_components"][0]["source"]["path"] = str(ROOT / "components")
         if uart:
@@ -49,6 +52,8 @@ class ConfigTests(unittest.TestCase):
             self.add_proxy(config, proxy)
         if entities:
             config["comfoair"].update(entities)
+        for key in remove:
+            config["comfoair"].pop(key, None)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "test.yaml"
             path.write_text(yaml.safe_dump(config))
@@ -68,6 +73,17 @@ class ConfigTests(unittest.TestCase):
         result, generated = self.run_config(generate=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("set_size_select", generated)
+
+    def test_climate_name(self):
+        """ESPHome's entity registration names the climate; no custom setter remains."""
+        result, generated = self.run_config(generate=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # Same name and object-id hash as before the cleanup, so HA keeps the entity.
+        self.assertIn('App.register_climate(comfoair_id, "ComfoAir", ', generated)
+        self.assertNotIn("set_name(", generated)
+        # Like other entities, the climate may be ID-only (internal).
+        result, _ = self.run_config(remove=("name",))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_explicit_size_select(self):
         """Existing named and ID-only selects still generate code."""
@@ -92,8 +108,40 @@ class ConfigTests(unittest.TestCase):
         result, _ = self.run_config(entities=entities)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         validated = yaml.safe_load(result.stdout)["comfoair"]
+        counters = {
+            "level0_hours", "level1_hours", "level2_hours", "level3_hours",
+            "bypass_open_hours", "preheating_hours", "frost_protection_hours",
+            "filter_hours",
+        }
         for key in helper_comfoair["sensor"]:
-            self.assertEqual(validated[key]["state_class"], "measurement")
+            with self.subTest(state_class=key):
+                expected = "total_increasing" if key in counters else "measurement"
+                self.assertEqual(validated[key]["state_class"], expected)
+        # Durations and binary states use HA device classes; units are unchanged.
+        device_classes = {
+            **{key: "duration" for key in counters},
+            "response_age": "duration",
+            "frost_protection_minutes": "duration",
+            "bathroom_switch_on_delay_minutes": "duration",
+            "boost_ventilation_minutes": "duration",
+            "bypass_valve_open": "opening",
+            "filter_status_full": "problem",
+            "supply_fan_active": "running",
+            "frost_protection_active": "cold",
+            "preheating_state": "heat",
+            "preheating_active": "heat",
+        }
+        for key, device_class in device_classes.items():
+            with self.subTest(device_class=key):
+                self.assertEqual(validated[key].get("device_class"), device_class)
+        for key in counters:
+            self.assertEqual(validated[key]["unit_of_measurement"], "h")
+        # Entities without a device class icon get an mdi icon by default.
+        for key in ("intake_fan_speed", "bypass_valve", "filter_status", "error_status",
+                    "summer_mode", "p10_active", "bypass_present", "filter_warning_weeks"):
+            with self.subTest(icon=key):
+                self.assertTrue(validated[key].get("icon", "").startswith("mdi:"))
+        self.assertEqual(validated["icon"], "mdi:hvac")
         for key in helper_comfoair["number"]:
             self.assertNotIn("initial_value", validated[key])
             self.assertEqual(validated[key]["entity_category"], "config")
@@ -110,6 +158,7 @@ class ConfigTests(unittest.TestCase):
             "return_air_level": "%", "supply_air_level": "%", "bypass_valve": "%",
             "bypass_factor": None, "bypass_step": None, "bypass_correction": None,
             "motor_current_bypass": None, "motor_current_preheating": None,
+            "filter_warning_weeks": "w",
         }
         for key, unit in units.items():
             with self.subTest(sensor=key):

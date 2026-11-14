@@ -50,7 +50,10 @@ public:
   void set_parent(ComfoAirComponent *parent) { this->parent_ = parent; }
 
 protected:
-  void control(const std::string &value) override;
+  // SelectCall validates the option and passes its index. The string overload
+  // stays Select's own, which maps a valid option to this index overload.
+  using select::Select::control;
+  void control(size_t index) override;
 
 private:
   ComfoAirComponent *parent_{nullptr};
@@ -116,7 +119,15 @@ public:
   // Poll every 2000ms (previously 600ms)
   ComfoAirComponent() : Climate(), PollingComponent(2000), UARTDevice() {}
 
-  void setup() override { this->started_at_ = millis(); }
+  void setup() override
+  {
+    this->started_at_ = millis();
+    // Fan only is the sole supported mode; never publish the default (Off).
+    this->mode = climate::CLIMATE_MODE_FAN_ONLY;
+    // Climate leaves the target uninitialised. The ventilation-level reply
+    // publishes the climate before the first temperature reply, so start unknown.
+    this->target_temperature = NAN;
+  }
 
   // Return the traits of this controller.
   climate::ClimateTraits traits() override
@@ -134,7 +145,7 @@ public:
         climate::CLIMATE_FAN_LOW,
         climate::CLIMATE_FAN_MEDIUM,
         climate::CLIMATE_FAN_HIGH,
-        climate::CLIMATE_FAN_OFF,
+        climate::CLIMATE_FAN_QUIET,
     });
     return traits;
   }
@@ -157,6 +168,9 @@ public:
       case climate::CLIMATE_FAN_LOW:
         level = 0x02;
         break;
+      // Absent: fans keep running at the absent percentages, so it is reported
+      // as Quiet. Off is still accepted from lambdas written for older versions.
+      case climate::CLIMATE_FAN_QUIET:
       case climate::CLIMATE_FAN_OFF:
         level = 0x01;
         break;
@@ -184,26 +198,21 @@ public:
 
   void dump_config() override
   {
-    uint8_t *p;
     ESP_LOGCONFIG(TAG, "ComfoAir:");
     ESP_LOGCONFIG(TAG, "  Component version: 1.0.0");
     ESP_LOGCONFIG(TAG, "  Communication timeout: %u ms", static_cast<unsigned>(this->communication_timeout_));
     // LOG_UPDATE_INTERVAL(this);
-    p = bootloader_version_;
-    ESP_LOGCONFIG(TAG, "  Bootloader %.10s v%0d.%02d b%2d", p + 3, *p, *(p + 1), *(p + 2));
-    p = firmware_version_;
-    ESP_LOGCONFIG(TAG, "  Firmware %.10s v%0d.%02d b%2d", p + 3, *p, *(p + 1), *(p + 2));
-    p = connector_board_version_;
-    ESP_LOGCONFIG(TAG, "  Connector Board %.10s v%0d.%02d", p + 2, *p, *(p + 1));
-
-    if (*(p + 12) != 0)
-    {
-      ESP_LOGCONFIG(TAG, "  CC-Ease v%0d.%02d", *(p + 12) >> 4, *(p + 12) & 0x0f);
-    }
-    if (*(p + 13) != 0)
-    {
-      ESP_LOGCONFIG(TAG, "  CC-Luxe v%0d.%02d", *(p + 13) >> 4, *(p + 13) & 0x0f);
-    }
+    // At boot this runs before the unit has answered the version requests;
+    // each version is also logged when it arrives.
+    if (!this->bootloader_version_received_ && !this->firmware_version_received_ &&
+        !this->connector_board_version_received_)
+      ESP_LOGCONFIG(TAG, "  Unit versions: not received yet");
+    if (this->bootloader_version_received_)
+      this->log_bootloader_version_();
+    if (this->firmware_version_received_)
+      this->log_firmware_version_();
+    if (this->connector_board_version_received_)
+      this->log_connector_board_version_();
     if (this->has_proxy_uart_)
     {
       ESP_LOGCONFIG(TAG, "  Display proxy UART: enabled (CCEase / ComfoSense)");
@@ -363,6 +372,28 @@ public:
 
   float get_setup_priority() const override { return setup_priority::DATA; }
 
+  void log_bootloader_version_()
+  {
+    const uint8_t *p = this->bootloader_version_;
+    ESP_LOGCONFIG(TAG, "  Bootloader %.10s v%0d.%02d b%2d", p + 3, p[0], p[1], p[2]);
+  }
+
+  void log_firmware_version_()
+  {
+    const uint8_t *p = this->firmware_version_;
+    ESP_LOGCONFIG(TAG, "  Firmware %.10s v%0d.%02d b%2d", p + 3, p[0], p[1], p[2]);
+  }
+
+  void log_connector_board_version_()
+  {
+    const uint8_t *p = this->connector_board_version_;
+    ESP_LOGCONFIG(TAG, "  Connector Board %.10s v%0d.%02d", p + 2, p[0], p[1]);
+    if (p[12] != 0)
+      ESP_LOGCONFIG(TAG, "  CC-Ease v%0d.%02d", p[12] >> 4, p[12] & 0x0f);
+    if (p[13] != 0)
+      ESP_LOGCONFIG(TAG, "  CC-Luxe v%0d.%02d", p[13] >> 4, p[13] & 0x0f);
+  }
+
   void reset_errors(void) { reset_errors_(false, true); }
 
   void reset_filters(void) { reset_errors_(true, false); }
@@ -371,12 +402,6 @@ public:
   void error_reset(void) { reset_errors(); }
   void filter_reset(void) { reset_filters(); }
 
-  void set_name(const char *value) { name = value; }
-  void set_name(const char *value, uint32_t name_hash)
-  {
-    (void)name_hash;
-    name = value;
-  }
   void set_uart_component(uart::UARTComponent *parent) { set_uart_parent(parent); }
   void set_proxy_uart_component(uart::UARTComponent *proxy)
   {
@@ -429,7 +454,9 @@ protected:
 
     ESP_LOGI(TAG, "Setting temperature to: %.1f", temperature);
     {
-      uint8_t command[CMD_SET_COMFORT_TEMPERATURE_LENGTH] = {(uint8_t)((temperature + 20.0f) * 2.0f)};
+      // Round to the unit's 0.5 degree steps; truncation turned 21.4999 into 21.0.
+      uint8_t command[CMD_SET_COMFORT_TEMPERATURE_LENGTH] = {
+          static_cast<uint8_t>(lroundf((temperature + 20.0f) * 2.0f))};
       if (send_control_command_(CMD_SET_COMFORT_TEMPERATURE, command, sizeof(command)))
         this->refresh_temperatures_ = true;
     }
@@ -811,12 +838,27 @@ protected:
     {
     case RES_GET_BOOTLOADER_VERSION:
       memcpy(bootloader_version_, msg_data, std::min<size_t>(msg_length_u8, sizeof(bootloader_version_)));
+      if (!bootloader_version_received_)
+      {
+        bootloader_version_received_ = true;
+        log_bootloader_version_();
+      }
       break;
     case RES_GET_FIRMWARE_VERSION:
       memcpy(firmware_version_, msg_data, std::min<size_t>(msg_length_u8, sizeof(firmware_version_)));
+      if (!firmware_version_received_)
+      {
+        firmware_version_received_ = true;
+        log_firmware_version_();
+      }
       break;
     case RES_GET_CONNECTOR_BOARD_VERSION:
       memcpy(connector_board_version_, msg_data, std::min<size_t>(msg_length_u8, sizeof(connector_board_version_)));
+      if (!connector_board_version_received_)
+      {
+        connector_board_version_received_ = true;
+        log_connector_board_version_();
+      }
       break;
     case RES_GET_FAN_STATUS:
     {
@@ -941,28 +983,25 @@ protected:
         ventilation_level->publish_state(static_cast<int>(msg_data[8]) - 1);
       }
 
-      // Fan Speed
+      // Fan Speed. The unit never stops ventilating, so the mode is always
+      // Fan only; Absent is the Quiet fan mode, not climate mode Off.
+      mode = climate::CLIMATE_MODE_FAN_ONLY;
       switch (msg_data[8])
       {
       case 0x00:
         fan_mode = climate::CLIMATE_FAN_AUTO;
-        mode = climate::CLIMATE_MODE_FAN_ONLY;
         break;
       case 0x01:
-        fan_mode = climate::CLIMATE_FAN_OFF;
-        mode = climate::CLIMATE_MODE_OFF;
+        fan_mode = climate::CLIMATE_FAN_QUIET;
         break;
       case 0x02:
         fan_mode = climate::CLIMATE_FAN_LOW;
-        mode = climate::CLIMATE_MODE_FAN_ONLY;
         break;
       case 0x03:
         fan_mode = climate::CLIMATE_FAN_MEDIUM;
-        mode = climate::CLIMATE_MODE_FAN_ONLY;
         break;
       case 0x04:
         fan_mode = climate::CLIMATE_FAN_HIGH;
-        mode = climate::CLIMATE_MODE_FAN_ONLY;
         break;
       }
 
@@ -1878,6 +1917,9 @@ protected:
   uint32_t started_at_{0};
   uint32_t last_valid_response_{0};
   uint32_t last_health_check_{0};
+  bool bootloader_version_received_{false};
+  bool firmware_version_received_{false};
+  bool connector_board_version_received_{false};
   uint32_t communication_timeout_{90000};
   bool has_valid_response_{false};
   bool communication_timed_out_{false};
@@ -1889,7 +1931,6 @@ protected:
   uint8_t bootloader_version_[13]{0};
   uint8_t firmware_version_[13]{0};
   uint8_t connector_board_version_[14]{0};
-  const char *name{0};
 
 public:
   binary_sensor::BinarySensor *connected{nullptr};
@@ -2326,7 +2367,7 @@ inline void ComfoAirComponent::set_size_select(ComfoAirSizeSelect *size_select)
   }
 }
 
-inline void ComfoAirSizeSelect::control(const std::string &value)
+inline void ComfoAirSizeSelect::control(size_t index)
 {
   if (this->parent_ == nullptr)
   {
@@ -2334,15 +2375,9 @@ inline void ComfoAirSizeSelect::control(const std::string &value)
     return;
   }
 
-  auto index = this->index_of(value);
-  if (!index.has_value())
-  {
-    ESP_LOGW(TAG, "Unit size select received invalid option: %s", value.c_str());
-    return;
-  }
-
+  // Option order from __init__.py: Large (raw 1), Small (raw 2).
   uint8_t raw_size = 0;
-  switch (index.value())
+  switch (index)
   {
   case 0:
     raw_size = 1;
@@ -2351,7 +2386,7 @@ inline void ComfoAirSizeSelect::control(const std::string &value)
     raw_size = 2;
     break;
   default:
-    ESP_LOGW(TAG, "Unit size select index %zu not supported", index.value());
+    ESP_LOGW(TAG, "Unit size select index %zu not supported", index);
     return;
   }
 

@@ -53,6 +53,7 @@ class TestComfoAir : public esphome::comfoair::ComfoAirComponent
 {
 public:
   using ComfoAirComponent::bootloader_version_;
+  using ComfoAirComponent::bootloader_version_received_;
   using ComfoAirComponent::bus_busy_since_;
   using ComfoAirComponent::bus_owner_;
   using ComfoAirComponent::BusOwner;
@@ -61,7 +62,9 @@ public:
   using ComfoAirComponent::check_communication_;
   using ComfoAirComponent::checkRx_;
   using ComfoAirComponent::connector_board_version_;
+  using ComfoAirComponent::connector_board_version_received_;
   using ComfoAirComponent::firmware_version_;
+  using ComfoAirComponent::firmware_version_received_;
   using ComfoAirComponent::last_command_sent_;
   using ComfoAirComponent::last_display_frame_;
   using ComfoAirComponent::last_health_check_;
@@ -309,12 +312,17 @@ inline void run_decoder_tests()
       CHECK(!component.parseRxMessage_(message.data()));
     }
   }
+  // Versions arrive after dump_config at boot; each is logged once on arrival.
+  CHECK(!component.bootloader_version_received_ && !component.firmware_version_received_ &&
+        !component.connector_board_version_received_);
   decode(RES_GET_BOOTLOADER_VERSION, {3, 70, 32});
   decode(RES_GET_FIRMWARE_VERSION, {3, 71, 33});
   decode(RES_GET_CONNECTOR_BOARD_VERSION, {2, 12});
   CHECK(component.bootloader_version_[1] == 70);
   CHECK(component.firmware_version_[2] == 33);
   CHECK(component.connector_board_version_[1] == 12);
+  CHECK(component.bootloader_version_received_ && component.firmware_version_received_ &&
+        component.connector_board_version_received_);
 
   sensor::Sensor intake, exhaust, intake_rpm, exhaust_rpm;
   component.intake_fan_speed = &intake;
@@ -411,7 +419,7 @@ inline void run_decoder_tests()
   const int expected_numbers[] = {15, 35, 50, 70, 16, 36, 51, 71};
   for (int i = 0; i < 8; ++i)
     CHECK(fan_numbers[i].state == expected_numbers[i]);
-  const climate::ClimateFanMode modes[] = {climate::CLIMATE_FAN_AUTO, climate::CLIMATE_FAN_OFF,
+  const climate::ClimateFanMode modes[] = {climate::CLIMATE_FAN_AUTO, climate::CLIMATE_FAN_QUIET,
                                            climate::CLIMATE_FAN_LOW, climate::CLIMATE_FAN_MEDIUM,
                                            climate::CLIMATE_FAN_HIGH};
   for (uint8_t level = 0; level < 5; ++level)
@@ -419,7 +427,7 @@ inline void run_decoder_tests()
     decode(RES_GET_VENTILATION_LEVEL, {15, 35, 50, 15, 35, 50, 35, 35, level, 1, 70, 70});
     CHECK(ventilation.state == static_cast<int>(level) - 1);
     CHECK(component.fan_mode == modes[level]);
-    CHECK(component.mode == (level == 1 ? climate::CLIMATE_MODE_OFF : climate::CLIMATE_MODE_FAN_ONLY));
+    CHECK(component.mode == climate::CLIMATE_MODE_FAN_ONLY);
     uart.output.clear();
     auto call = component.make_call();
     call.set_fan_mode(modes[level]);
@@ -427,12 +435,28 @@ inline void run_decoder_tests()
     CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_LEVEL, 1, level,
                                                uint8_t(0xAD + CMD_SET_LEVEL + 1 + level), 7, 0x0F}));
   }
+  // Off, the fan mode used for Absent before Quiet, still selects Absent.
+  uart.output.clear();
+  auto legacy_off = component.make_call();
+  legacy_off.set_fan_mode(climate::CLIMATE_FAN_OFF);
+  component.control(legacy_off);
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_LEVEL, 1, 1,
+                                             uint8_t(0xAD + CMD_SET_LEVEL + 1 + 1), 7, 0x0F}));
   uart.output.clear();
   auto call = component.make_call();
   call.set_target_temperature(21.5f);
   component.control(call);
   CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_COMFORT_TEMPERATURE, 1, 83,
                                              uint8_t(0xAD + CMD_SET_COMFORT_TEMPERATURE + 1 + 83), 7, 0x0F}));
+  // Values just below a half step round to it instead of truncating down.
+  uart.output.clear();
+  component.set_comfort_temperature(21.49f);
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_COMFORT_TEMPERATURE, 1, 83,
+                                             uint8_t(0xAD + CMD_SET_COMFORT_TEMPERATURE + 1 + 83), 7, 0x0F}));
+  uart.output.clear();
+  component.set_comfort_temperature(21.2f);
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_COMFORT_TEMPERATURE, 1, 82,
+                                             uint8_t(0xAD + CMD_SET_COMFORT_TEMPERATURE + 1 + 82), 7, 0x0F}));
   uart.output.clear();
   component.set_level(-1);
   component.set_level(5);
@@ -596,12 +620,31 @@ inline void run_control_tests()
     message.insert(message.end(), payload.begin(), payload.end());
     CHECK(component.parseRxMessage_(message.data()));
   };
+  // Fan only is the sole advertised mode, and it is published from the start.
+  const auto traits = component.get_traits();
+  CHECK(traits.supports_mode(climate::CLIMATE_MODE_FAN_ONLY));
+  CHECK(!traits.supports_mode(climate::CLIMATE_MODE_OFF));
+  CHECK(traits.supports_fan_mode(climate::CLIMATE_FAN_QUIET));
+  CHECK(!traits.supports_fan_mode(climate::CLIMATE_FAN_OFF));
+  CHECK(component.mode == climate::CLIMATE_MODE_FAN_ONLY);
+  // The target is unknown until the unit reports it, not uninitialised memory.
+  CHECK(std::isnan(component.target_temperature));
+
   // A climate-only configuration gets temperature in its first publication.
-  bool saw_current_temperature = false;
-  component.add_on_state_callback([&](climate::Climate &state)
-                                  { saw_current_temperature = state.current_temperature == 22; });
+  // One captured reference keeps the callback in inline storage (no leak).
+  struct
+  {
+    bool saw_current_temperature{false};
+    climate::ClimateMode mode{climate::CLIMATE_MODE_OFF};
+  } published;
+  component.add_on_state_callback([&published](climate::Climate &state)
+                                  {
+                                    published.saw_current_temperature = state.current_temperature == 22;
+                                    published.mode = state.mode;
+                                  });
   decode(RES_GET_TEMPERATURES, {82, 42, 62, 84, 86, 0x04, 88, 90, 92});
-  CHECK(component.current_temperature == 22 && saw_current_temperature);
+  CHECK(component.current_temperature == 22 && published.saw_current_temperature);
+  CHECK(published.mode == climate::CLIMATE_MODE_FAN_ONLY);
   component.set_comfort_temperature(NAN);
   CHECK(uart.output.empty());
 
@@ -637,6 +680,21 @@ inline void run_control_tests()
   CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_GET_STATUS, 0, 0x82, 7, 0x0F}));
   decode(RES_GET_STATUS, {1, 1, 1, 2, 0x47, 0, 0, 0, 0, 0, 0});
   CHECK(size.state == "Small");
+
+  // The select writes by index (SelectCall's path); unknown options never reach it.
+  comfoair::ComfoAirSizeSelect size_select;
+  size_select.traits.set_options({"Large", "Small"});
+  component.set_size_select(&size_select);
+  CHECK(size_select.active_index().value_or(9) == 1);
+  uart.output.clear();
+  size_select.make_call().set_option("Large").perform();
+  CHECK(uart.output == std::vector<uint8_t>({7, 0xF0, 0, CMD_SET_STATUS, 8, 1, 1, 1, 1, 0x47, 0, 0, 0,
+                                             uint8_t(0xAD + CMD_SET_STATUS + 8 + 1 + 1 + 1 + 1 + 0x47), 7,
+                                             0x0F}));
+  CHECK(size_select.active_index().value_or(9) == 1); // shown as changed only after readback
+  uart.output.clear();
+  size_select.make_call().set_option("Medium").perform();
+  CHECK(uart.output.empty());
 
   // Silence invalidates live numeric data and blocks installer writes.
   sensor::Sensor temperature, age;
