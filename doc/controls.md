@@ -6,9 +6,10 @@ next available two-second poll slot. Rejected, expired, or ignored commands do
 not change the displayed device state. Filter/error resets are not retried
 automatically.
 
-Climate fan **Off** means the unit's **Absent** ventilation level. Fans may
-continue running at the configured absent percentages. It is not a guarantee
-that the fans or ventilation unit are electrically off.
+Climate fan **Quiet** means the unit's **Absent** ventilation level. Fans may
+continue running at the configured absent percentages, so the climate mode stays
+**Fan only**. Fan mode **Off**, used for Absent up to version 1.0.0, is still
+accepted as Absent but is no longer offered or reported.
 
 ## Installer settings
 

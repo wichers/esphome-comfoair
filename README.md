@@ -231,8 +231,10 @@ comfoair:
 
 The sensor defined here is a full list of sensors - if you remove a sensor from the yaml definition it will not be monitored.
 
-The climate fan mode **Off** selects **Absent**. Fans can still run at their
-configured absent percentages. It does not electrically stop the unit.
+The climate fan mode **Quiet** selects **Absent**. Fans can still run at their
+configured absent percentages. The climate mode is always **Fan only**, because
+the unit never stops ventilating. Versions up to 1.0.0 showed Absent as fan mode
+**Off** and climate mode **Off**; fan mode Off is still accepted as Absent.
 
 Installer-size and fan-tuning controls are opt-in. Read
 [controls and communication health](doc/controls.md) before enabling them.

@@ -49,14 +49,13 @@ ComfoAirErrorResetButton = comfoair_ns.class_("ComfoAirErrorResetButton", button
 
 DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["sensor", "climate", "binary_sensor", "text_sensor", "select", "number", "button"]
-REQUIRED_KEY_NAME = "name"
 CONF_HUB_ID = "comfoair"
 CONF_PROXY_UART_ID = "proxy_uart"
 CONF_CONNECTED = "connected"
 CONF_RESPONSE_AGE = "response_age"
 CONF_COMMUNICATION_TIMEOUT = "communication_timeout"
 
-UNIT_WEEK = "weeks"
+UNIT_WEEK = "w"
 
 CONF_TYPE = "type"
 CONF_SIZE = "size"
@@ -619,7 +618,6 @@ comfoair_sensors_schemas = cv.Schema(
 CONFIG_SCHEMA = (
     climate.climate_schema(ComfoAirComponent).extend(
         {
-            cv.Required(REQUIRED_KEY_NAME): cv.string,
             cv.Optional(CONF_PROXY_UART_ID): cv.use_id(uart.UARTComponent),
             cv.Optional(
                 CONF_COMMUNICATION_TIMEOUT, default="90s"
@@ -666,7 +664,6 @@ async def to_code(config):
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
     await climate.register_climate(var, config)
-    cg.add(var.set_name(config[REQUIRED_KEY_NAME]))
     cg.add(var.set_communication_timeout(config[CONF_COMMUNICATION_TIMEOUT].total_milliseconds))
     paren = await cg.get_variable(config[CONF_UART_ID])
     cg.add(var.set_uart_component(paren))
