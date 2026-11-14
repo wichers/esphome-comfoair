@@ -14,13 +14,13 @@ metadata. For untagged development builds also record the Git commit.
 
 1. Make a focused PR updating `VERSION`, the component version in `dump_config`,
    every example's project version and source `ref`, `CHANGELOG.md`,
-   `RELEASE_NOTES.md`, and the Release workflow's default version. Run
-   `python .github/scripts/check_release.py 1.0.0` with the actual version.
+   `RELEASE_NOTES.md`. Run
+   `python .github/scripts/check_release.py 1.1.0` with the actual version.
 2. Require all ESPHome workflow jobs to pass, review migration notes and merge
    the release's fixes. A repository administrator should configure a branch
    rule requiring these checks and PR review; this cannot be configured by a
    contributor without administration permission.
-3. Test the merged commit using the installation's own YAML with a local source.
+3. Before merging the release PR, test its commit using the installation's own YAML with a local source.
    Confirm the board, flash/PSRAM, UART pins, network target and secrets before
    any upload. Record model/firmware, entity identities and baseline readings;
    then observe multiple complete polling cycles after reboot. Aim for a
@@ -34,22 +34,26 @@ metadata. For untagged development builds also record the Git commit.
    Software fixtures do not establish hardware verification. A direct-UART
    release may proceed with proxy/recovery/installer scenarios explicitly marked
    hardware-unverified in the public release notes.
-5. From Actions → Release, select **master**, enter the version, confirm the
-   evidence review and provide the actual hardware results plus a separate list
-   of unverified scenarios. The workflow validates metadata,
-   reruns the full baseline CI and latest-stable check, verifies master has not
-   advanced, and creates the tag and release using `gh` only if all checks pass.
-   Existing tags are rejected. No universal binary is uploaded.
+5. Record actual hardware results and unverified scenarios in `RELEASE_NOTES.md`
+   and review them in the release PR. Merging a `VERSION` change into **master**
+   automatically validates metadata, reruns the baseline CI (including firmware
+   compilation), verifies master has not advanced, and creates the tag and
+   GitHub Release from that exact commit. Existing tags are rejected.
+   No universal binary is uploaded: users build with their own board and secrets.
 
-The workflow does not publish on PR merge, tag push or schedule. A manual
-dispatch is the deliberate publication step. There is no release before the
-required PRs merge and the recorded hardware evidence and limits are reviewed.
-The confirmation attests the accuracy of the evidence; it does not attest that
-every scenario has been tested. Never mark an unperformed test as verified.
+Pushes without a `VERSION` change do not start the Release workflow. If the file
+changes but its trimmed version is unchanged, release builds and publication are
+skipped. PRs, tag pushes and schedules do not publish releases. Ordinary ESPHome
+CI still runs on code changes independently of release publication.
+
+Review hardware evidence before merging: automation does not establish physical
+verification. Never mark an unperformed test as verified. If checks fail, rerun
+the failed workflow after resolving the cause. If master advances during checks,
+prepare a new version on the latest master; published tags are never moved.
 
 ## Installation and rollback
 
-Normal installations use `source.ref: v1.0.0` and `refresh: never`, replacing
+Normal installations use `source.ref: v1.1.0` and `refresh: never`, replacing
 the version only when deliberately upgrading. Development uses a local source
 or an explicitly chosen branch. Source changes do not upload firmware by
 themselves. To roll back after a later release, select the previous published

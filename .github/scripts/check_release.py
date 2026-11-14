@@ -2,6 +2,7 @@
 
 import argparse
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,11 +32,23 @@ def check_release(version):
 def main():
     """Print the checked tag or exit unsuccessfully with an actionable message."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("version")
+    parser.add_argument("version", nargs="?")
+    parser.add_argument("--previous-ref")
     arguments = parser.parse_args()
     try:
-        print(check_release(arguments.version))
-    except ValueError as error:
+        version = (ROOT / "VERSION").read_text().strip()
+        if arguments.previous_ref:
+            previous = subprocess.run(
+                ["git", "show", f"{arguments.previous_ref}:VERSION"],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            if previous == version:
+                return
+        print(check_release(arguments.version if arguments.version is not None else version))
+    except (ValueError, subprocess.CalledProcessError) as error:
         parser.error(str(error))
 
 

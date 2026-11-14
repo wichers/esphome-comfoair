@@ -1,27 +1,9 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Version without v; must match VERSION
-        required: true
-        default: "1.0.0"
-        type: string
-      evidence_reviewed:
-        description: I reviewed the recorded hardware evidence and unverified scenarios
-        required: true
-        default: false
-        type: boolean
-      hardware_notes:
-        description: Actual tested models/firmware and results or evidence link (no secrets)
-        required: true
-        type: string
-      unverified_hardware:
-        description: Hardware scenarios not verified for this release
-        required: true
-        default: Wall-controller proxy; serial-disconnect recovery; installer/reset commands; long-term operation
-        type: string
+  push:
+    branches: [master]
+    paths: [VERSION]
 
 permissions:
   contents: read
@@ -33,30 +15,32 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
-      - name: Require merged master, consistent metadata and hardware evidence
+          python-version: "3.15"
+      - name: Validate changed version and release metadata
+        id: version
         env:
-          REQUESTED_VERSION: ${{ inputs.version }}
-          EVIDENCE_REVIEWED: ${{ inputs.evidence_reviewed }}
-          HARDWARE_NOTES: ${{ inputs.hardware_notes }}
-          UNVERIFIED_HARDWARE: ${{ inputs.unverified_hardware }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          test "$GITHUB_REF" = refs/heads/master
-          test "$EVIDENCE_REVIEWED" = true
-          test -n "$HARDWARE_NOTES"
-          test -n "$UNVERIFIED_HARDWARE"
-          python .github/scripts/check_release.py "$REQUESTED_VERSION"
+          tag="$(python .github/scripts/check_release.py \
+            --previous-ref "$BEFORE")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   checks:
     needs: prepare
+    if: needs.prepare.outputs.tag != ''
     uses: ./.github/workflows/esphome.yml
 
   publish:
     needs: [prepare, checks]
+    if: needs.prepare.outputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -65,9 +49,7 @@ jobs:
       - name: Publish a new immutable version from the checked commit
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ inputs.version }}
-          HARDWARE_NOTES: ${{ inputs.hardware_notes }}
-          UNVERIFIED_HARDWARE: ${{ inputs.unverified_hardware }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -76,7 +58,7 @@ jobs:
             echo "Master changed during validation; rerun Release on the latest master." >&2
             exit 1
           fi
-          tag="v$RELEASE_VERSION"
+          tag="$RELEASE_TAG"
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
             echo "Tag $tag already exists; published tags must not be moved." >&2
             exit 1
@@ -84,6 +66,4 @@ jobs:
             result=$?
             if [[ "$result" != 2 ]]; then exit "$result"; fi
           fi
-          printf '\n## Hardware validation\n\n%s\n' "$HARDWARE_NOTES" >> RELEASE_NOTES.md
-          printf '\n## Hardware verification limits\n\n%s\n' "$UNVERIFIED_HARDWARE" >> RELEASE_NOTES.md
           gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes-file RELEASE_NOTES.md

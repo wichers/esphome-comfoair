@@ -199,7 +199,7 @@ public:
   void dump_config() override
   {
     ESP_LOGCONFIG(TAG, "ComfoAir:");
-    ESP_LOGCONFIG(TAG, "  Component version: 1.0.0");
+    ESP_LOGCONFIG(TAG, "  Component version: 1.1.0");
     ESP_LOGCONFIG(TAG, "  Communication timeout: %u ms", static_cast<unsigned>(this->communication_timeout_));
     // LOG_UPDATE_INTERVAL(this);
     // At boot this runs before the unit has answered the version requests;

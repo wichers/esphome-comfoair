@@ -5,6 +5,13 @@ component changes; ESPHome itself has a separate version.
 
 ## [Unreleased]
 
+## [1.1.0]
+
+### Added
+
+- Automatic releases on master when VERSION changes, gated on metadata validation
+  and the existing CI/firmware builds. Release PRs record hardware evidence and limits.
+
 ### Fixed
 
 - The climate entity no longer reports mode Off, which it did not advertise as

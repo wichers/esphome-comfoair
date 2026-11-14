@@ -36,7 +36,7 @@ native API disabled. Copy `secrets.example.yaml` to `secrets.yaml` and replace
 every placeholder with installation-specific values. Generate an API encryption
 key with `openssl rand -base64 32` when using the native API examples.
 
-Installation examples target **v1.0.0**. Use them after that release is published;
+Installation examples target **v1.1.0**. Use them after that release is published;
 for development use a local component source as shown in `tests/`. A tag selects
 component source, not a universal firmware image: board, pins, flash/PSRAM and
 credentials must match your hardware.
@@ -48,7 +48,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/wichers/esphome-comfoair
-      ref: v1.0.0
+      ref: v1.1.0
     refresh: never
     components: [comfoair]
 ```

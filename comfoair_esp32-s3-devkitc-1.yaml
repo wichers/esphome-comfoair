@@ -15,7 +15,7 @@ esphome:
   area: lab #livingroom
   project:
     name: "wichers.comfoair" # author_name.project_name
-    version: "1.0.0"
+    version: "1.1.0"
   # debug_scheduler: false
   on_boot:
     # default to red LED when connecting
@@ -58,7 +58,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/wichers/esphome-comfoair
-      ref: v1.0.0
+      ref: v1.1.0
     refresh: never
     components: [comfoair]
 

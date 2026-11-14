@@ -9,7 +9,7 @@ esp32:
 esphome:
   project:
     name: wichers.comfoair
-    version: "1.0.0"
+    version: "1.1.0"
   name: ${node_name}
   comment: ${device_name}
   friendly_name: "${device_name}"
@@ -21,7 +21,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/wichers/esphome-comfoair
-      ref: v1.0.0
+      ref: v1.1.0
     refresh: never
     components: [comfoair]
 
