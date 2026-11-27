@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        esphome: ["2026.8.1", "2026.10.0"]
+        esphome: ["2026.8.1", "2026.10.0", "2026.11.0"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        esphome: ["2026.8.1", "2026.10.0"]
+        esphome: ["2026.8.1", "2026.10.0", "2026.11.0"]
         config: [esp32-s3, esp32, esp32-arduino, esp8266, minimal]
     steps:
       - uses: actions/checkout@v7
