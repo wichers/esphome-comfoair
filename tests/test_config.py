@@ -78,9 +78,16 @@ class ConfigTests(unittest.TestCase):
         """ESPHome's entity registration names the climate; no custom setter remains."""
         result, generated = self.run_config(generate=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # Same name and object-id hash as before the cleanup, so HA keeps the entity.
-        self.assertIn('App.register_climate(comfoair_id, "ComfoAir", ', generated)
+
+        # Preserve the entity name and object ID across ESPHome versions.
+        self.assertRegex(
+            generated,
+            r'App\.register_climate\(comfoair_id, '
+            r'(?:"ComfoAir"|ESPHOME_PSTR\("ComfoAir"\)), '
+            r'1682560679,'
+        )
         self.assertNotIn("set_name(", generated)
+
         # Like other entities, the climate may be ID-only (internal).
         result, _ = self.run_config(remove=("name",))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
